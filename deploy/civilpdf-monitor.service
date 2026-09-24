@@ -1,6 +1,6 @@
 [Unit]
 Description=CivilPDF-DX production monitor (healthcheck + email alert)
-Documentation=https://github.com/Kensan196948G/CivilPDF-DX
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=oneshot

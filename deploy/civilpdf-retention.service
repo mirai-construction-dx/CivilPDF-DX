@@ -1,6 +1,6 @@
 [Unit]
 Description=CivilPDF-DX retention / GDPR deletion pass (archive expiries + purge requested deletions)
-Documentation=https://github.com/Kensan196948G/CivilPDF-DX
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 After=civilpdf-backup.service
 
 [Service]

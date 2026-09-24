@@ -1,6 +1,6 @@
 [Unit]
 Description=CivilPDF-DX production backup (local PostgreSQL in docker compose + uploads)
-Documentation=https://github.com/Kensan196948G/CivilPDF-DX
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=oneshot

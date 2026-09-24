@@ -2,7 +2,7 @@
 
 > **現場の書類管理を、もっとシンプルに。もっと安全に。**
 
-[![CI](https://github.com/Kensan196948G/CivilPDF-DX/actions/workflows/ci.yml/badge.svg)](https://github.com/Kensan196948G/CivilPDF-DX/actions/workflows/ci.yml)
+[![CI](https://github.com/mirai-construction-dx/CivilPDF-DX/actions/workflows/ci.yml/badge.svg)](https://github.com/mirai-construction-dx/CivilPDF-DX/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -184,7 +184,7 @@ https://civilpdf-mvp.mirai-dx-platform.com/
 
 ## 🆘 問い合わせ・サポート
 
-- 🐛 **不具合報告・改善要望** → [GitHub Issues](https://github.com/Kensan196948G/CivilPDF-DX/issues)
+- 🐛 **不具合報告・改善要望** → [GitHub Issues](https://github.com/mirai-construction-dx/CivilPDF-DX/issues)
 - 🔒 **セキュリティ脆弱性** → [SECURITY.md](SECURITY.md) の手順で報告
 - 📄 **ライセンス** → [MIT License](LICENSE)
 

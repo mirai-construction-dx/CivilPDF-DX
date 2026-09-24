@@ -21,7 +21,7 @@
 
 ```powershell
 # PowerShell (管理者不要)
-git clone https://github.com/Kensan196948G/CivilPDF-DX.git C:\CivilPDF
+git clone https://github.com/mirai-construction-dx/CivilPDF-DX.git C:\CivilPDF
 cd C:\CivilPDF
 
 # Git 改行コード設定 (LF 維持)
