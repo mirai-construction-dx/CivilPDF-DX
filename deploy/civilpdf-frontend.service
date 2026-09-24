@@ -7,7 +7,7 @@
 
 [Unit]
 Description=CivilPDF-DX Console Frontend (vite preview 127.0.0.1:5182) [RETIRED — use docker compose]
-Documentation=https://github.com/Kensan196948G/CivilPDF-DX
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 After=civilpdf-backend.service
 Wants=civilpdf-backend.service
 

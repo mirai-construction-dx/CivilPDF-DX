@@ -117,7 +117,7 @@ nssm version    # → NSSM 2.24 と表示されればOK
 # PowerShell で実行（管理者不要）
 
 # クローン
-git clone https://github.com/Kensan196948G/CivilPDF-DX.git C:\CivilPDF
+git clone https://github.com/mirai-construction-dx/CivilPDF-DX.git C:\CivilPDF
 cd C:\CivilPDF
 
 # 重要: 改行コードを LF に固定（必ず実行すること）

@@ -9,7 +9,7 @@
 
 [Unit]
 Description=CivilPDF-DX Console Backend (uvicorn 127.0.0.1:8180) [RETIRED — use docker compose]
-Documentation=https://github.com/Kensan196948G/CivilPDF-DX
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=simple

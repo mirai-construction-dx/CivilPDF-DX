@@ -46,7 +46,7 @@ docker compose version    # Docker Compose version v2.x 以上
 ## 📌 2. リポジトリ取得
 
 ```bash
-git clone https://github.com/Kensan196948G/CivilPDF-DX.git
+git clone https://github.com/mirai-construction-dx/CivilPDF-DX.git
 cd CivilPDF-DX
 git checkout main
 ```

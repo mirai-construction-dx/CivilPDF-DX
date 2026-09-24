@@ -243,7 +243,7 @@ M365_ALLOWED_NETWORKS=172.23.0.0/16,10.212.134.0/24
 $base = "C:\Apps\CivilPDF-DX"
 New-Item -ItemType Directory -Force -Path $base | Out-Null
 Set-Location $base
-git clone https://github.com/Kensan196948G/CivilPDF-DX.git .
+git clone https://github.com/mirai-construction-dx/CivilPDF-DX.git .
 git checkout main
 
 # 2. バックエンド依存インストール
