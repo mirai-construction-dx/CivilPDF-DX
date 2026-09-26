@@ -20,8 +20,8 @@ import {
 } from "../api/apps";
 
 // Fixtures mirror the real CivilPDF-Editor v1.2.0 GitHub Release (Tauri v2,
-// unsigned stable, real Tauri-generated packages — no fabricated zip/pkg/intune,
-// and only the "stable" channel exists).
+// unsigned stable, only the "stable" channel exists). Distribution is
+// Windows-only; macOS arrives via pending_platforms (後日対応).
 const releases = {
   stable_version: "v1.2.0",
   packages: [
@@ -38,16 +38,24 @@ const releases = {
       available: false,
     },
     {
-      id: "linux-deb",
-      platform: "linux",
-      format: "deb",
-      label: "Debian / Ubuntu (.deb)",
-      filename: "CivilPDF.Editor_1.2.0_amd64.deb",
+      id: "win-msi",
+      platform: "windows",
+      format: "msi",
+      label: "インストーラー (.msi)",
+      filename: "CivilPDF.Editor_1.2.0_x64_en-US.msi",
       version: "1.2.0",
-      size_label: "約 2.3 MB",
+      size_label: "約 2.4 MB",
       sha256: null,
-      download_path: "/api/v1/apps/download/linux-deb",
+      download_path: "/api/v1/apps/download/win-msi",
       available: true,
+    },
+  ],
+  pending_platforms: [
+    {
+      platform: "macos",
+      label: "macOS",
+      status: "pending" as const,
+      note: "後日対応（ペンディング）。現在は Windows 版のみ提供しています",
     },
   ],
   channels: [
@@ -86,11 +94,7 @@ const buildInfo = {
   build_date: "2026-06-22",
   channel: "stable",
   runtime: "Tauri v2（システムの WebView を利用）",
-  supported_os: [
-    "Windows 10 / 11 (64bit)",
-    "macOS 13 Ventura+ (Universal)",
-    "Linux (.deb / .AppImage / .rpm, x86_64)",
-  ],
+  supported_os: ["Windows 10 / 11 (64bit)"],
   min_supported_version: "1.2.0",
 };
 
@@ -122,15 +126,38 @@ describe("AppsView", () => {
     vi.mocked(getBuildInfo).mockResolvedValue(buildInfo);
   });
 
-  it("renders real Tauri packages from the releases API", async () => {
+  it("renders the Windows packages from the releases API", async () => {
     renderView();
     await waitFor(() => {
       expect(
         screen.getByText("インストーラー (.exe / NSIS)"),
       ).toBeInTheDocument();
     });
-    // A Linux package is present too (Tauri produces .deb/.AppImage/.rpm).
-    expect(screen.getByText("Debian / Ubuntu (.deb)")).toBeInTheDocument();
+    expect(screen.getByText("インストーラー (.msi)")).toBeInTheDocument();
+    // No macOS/Linux installers are offered.
+    expect(screen.queryByText(/\.dmg|\.deb|AppImage|\.rpm/)).toBeNull();
+  });
+
+  it("shows macOS as pending and opens an explanatory modal", async () => {
+    const user = userEvent.setup();
+    const props = renderView();
+    const card = await screen.findByTestId("pending-macos");
+    expect(card).toHaveTextContent("後日対応（ペンディング）");
+    await user.click(card);
+    expect(props.onShowModal).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "macOS — 後日対応" }),
+    );
+    // Pending platforms have no package, so no download URL is requested.
+    expect(getDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("renders without pending_platforms (older backend)", async () => {
+    const { pending_platforms: _omit, ...legacy } = releases;
+    void _omit;
+    vi.mocked(getAppsReleases).mockResolvedValue(legacy);
+    renderView();
+    await screen.findByText("インストーラー (.exe / NSIS)");
+    expect(screen.queryByTestId("pending-macos")).toBeNull();
   });
 
   it("renders release notes from the API", async () => {
