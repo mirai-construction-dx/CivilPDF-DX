@@ -479,7 +479,9 @@ def test_readiness_flags_unreadable_documents_and_is_not_ready(
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["ready"] is False, "a document that cannot be packaged must not be 'ready'"
+    assert (
+        data["ready"] is False
+    ), "a document that cannot be packaged must not be 'ready'"
     assert data["document_count"] == 2
     assert len(data["unreadable_documents"]) == 1
     assert data["unreadable_documents"][0]["title"] == "欠損図面"
@@ -504,7 +506,9 @@ def test_readiness_excludes_soft_deleted_documents(
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     data = resp.json()
-    assert data["document_count"] == 1, "deletion-requested documents must not be delivered"
+    assert (
+        data["document_count"] == 1
+    ), "deletion-requested documents must not be delivered"
     assert data["ready"] is True
 
 
@@ -528,7 +532,9 @@ def test_zip_excludes_soft_deleted_documents(
     assert resp.status_code == 200
     zf = zipfile.ZipFile(io.BytesIO(resp.content))
     payload_entries = [n for n in zf.namelist() if not n.endswith("INDEX.XML")]
-    assert len(payload_entries) == 1, f"trashed document leaked into the package: {payload_entries}"
+    assert (
+        len(payload_entries) == 1
+    ), f"trashed document leaked into the package: {payload_entries}"
 
     index = zf.read(next(n for n in zf.namelist() if n.endswith("INDEX.XML"))).decode()
     assert "誤アップロード" not in index
@@ -640,7 +646,9 @@ def test_package_numbering_is_deterministic(
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
-        index = zf.read(next(n for n in zf.namelist() if n.endswith("INDEX.XML"))).decode()
+        index = zf.read(
+            next(n for n in zf.namelist() if n.endswith("INDEX.XML"))
+        ).decode()
         from xml.etree import ElementTree as ET
 
         root = ET.fromstring(index)

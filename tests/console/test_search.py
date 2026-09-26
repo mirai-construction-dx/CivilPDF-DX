@@ -279,6 +279,7 @@ class TestReindex:
         )
         assert resp.status_code == 403
 
+
 class TestSearchQueryCost:
     """Search must not issue one query per hit (N+1 on a hot read path).
 
@@ -335,9 +336,7 @@ class TestSearchQueryCost:
             db_session.commit()
 
         seed(2, "N1-A")
-        small = self._search_select_count(
-            client, auth_headers, db_session, "N1SEARCH"
-        )
+        small = self._search_select_count(client, auth_headers, db_session, "N1SEARCH")
 
         seed(10, "N1-B")
         big = self._search_select_count(client, auth_headers, db_session, "N1SEARCH")

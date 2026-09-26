@@ -165,9 +165,12 @@ def test_guard_honours_the_allowlist():
     def login_without_token():
         return {}
 
-    assert _find_unprotected(
-        [(r.path, r) for r in probe.routes if isinstance(r, APIRoute)]
-    ) == []
+    assert (
+        _find_unprotected(
+            [(r.path, r) for r in probe.routes if isinstance(r, APIRoute)]
+        )
+        == []
+    )
 
 
 def test_every_api_route_requires_authentication_unless_allowlisted():
@@ -177,8 +180,7 @@ def test_every_api_route_requires_authentication_unless_allowlisted():
         "These API routes have no authentication dependency. Either add "
         "Depends(get_current_user) (directly or via require_admin/"
         "require_manager) or add an explicit entry to PUBLIC_API_ROUTES with a "
-        "comment explaining why it is safe to expose:\n  "
-        + "\n  ".join(unprotected)
+        "comment explaining why it is safe to expose:\n  " + "\n  ".join(unprotected)
     )
 
 
@@ -203,4 +205,6 @@ def test_public_endpoints_are_few_and_deliberate():
     )
     # Only the auth/SSO handshake may be unauthenticated.
     for method, path in public_api:
-        assert path.startswith("/api/v1/auth/"), f"unexpected public route: {method} {path}"
+        assert path.startswith(
+            "/api/v1/auth/"
+        ), f"unexpected public route: {method} {path}"

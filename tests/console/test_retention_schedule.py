@@ -48,7 +48,14 @@ def _make_user(db, email: str = "retention-owner@example.com"):
     return user
 
 
-def _make_doc(db, owner_id: str, *, retention_expires_at=None, deletion_requested_at=None, file_path=None):
+def _make_doc(
+    db,
+    owner_id: str,
+    *,
+    retention_expires_at=None,
+    deletion_requested_at=None,
+    file_path=None,
+):
     from models.document import Document, DocumentType
 
     doc = Document(

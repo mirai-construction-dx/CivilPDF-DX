@@ -171,8 +171,9 @@ def main(argv: list[str] | None = None) -> int:
             "retention pass ({mode}): expired_documents={expired_documents} "
             "deletion_processed={deletion_processed} "
             "deletion_deleted_files={deletion_deleted_files} "
-            "deletion_errors={deletion_errors} seeded_policies={seeded_policies}"
-            .format(**summary)
+            "deletion_errors={deletion_errors} seeded_policies={seeded_policies}".format(
+                **summary
+            )
         )
         if not apply_changes:
             print("(dry-run: nothing was changed; re-run with --apply to enforce)")

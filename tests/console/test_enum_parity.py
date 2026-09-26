@@ -77,7 +77,9 @@ def test_model_enum_members_exist_as_postgresql_labels():
 def test_enum_parity_check_covers_every_enum_column():
     """Guard the guard: the parity test must not silently check zero columns."""
     columns = list(_enum_columns())
-    assert columns, "no Enum columns discovered — the parity check is not testing anything"
+    assert (
+        columns
+    ), "no Enum columns discovered — the parity check is not testing anything"
 
     labels = _postgres_enum_labels()
     assert labels, "no PostgreSQL enum labels found — is the schema migrated?"
@@ -113,9 +115,7 @@ def test_parity_check_rejects_the_pre_fix_label_set(monkeypatch):
             "finalized",
         }
     }
-    monkeypatch.setattr(
-        sys.modules[__name__], "_postgres_enum_labels", lambda: pre_fix
-    )
+    monkeypatch.setattr(sys.modules[__name__], "_postgres_enum_labels", lambda: pre_fix)
 
     with pytest.raises(AssertionError) as excinfo:
         test_model_enum_members_exist_as_postgresql_labels()
