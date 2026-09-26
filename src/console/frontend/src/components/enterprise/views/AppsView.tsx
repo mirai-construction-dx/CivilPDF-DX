@@ -16,12 +16,6 @@ interface ViewProps {
   onShowToast: (message: string, type?: "ok" | "warn" | "error") => void;
 }
 
-interface ToggleItem {
-  id: string;
-  label: string;
-  sub: string;
-}
-
 interface DeployTarget {
   id: string;
   name: string;
@@ -76,24 +70,6 @@ const buildPendingModalBody = (p: PendingPlatform): string =>
 const PLATFORM_LABEL: Record<string, string> = {
   windows: "Windows",
 };
-
-const TOGGLES: ToggleItem[] = [
-  {
-    id: "autoUpdate",
-    label: "自動アップデート",
-    sub: "バックグラウンドで最新版を自動適用",
-  },
-  {
-    id: "forceMin",
-    label: "最低バージョン強制",
-    sub: "最低サポート版（ビルド情報で確認）未満をブロック（表示のみ・未実装）",
-  },
-  {
-    id: "telemetry",
-    label: "テレメトリー収集",
-    sub: "クラッシュレポート・使用状況を収集（匿名）",
-  },
-];
 
 const DEPLOY_TARGETS: DeployTarget[] = [
   {
@@ -159,11 +135,6 @@ const DEPLOY_TARGETS: DeployTarget[] = [
 ];
 
 export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
-  const [toggles, setToggles] = useState<Record<string, boolean>>({
-    autoUpdate: true,
-    forceMin: true,
-    telemetry: false,
-  });
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [buildInfoLoading, setBuildInfoLoading] = useState(false);
   const releaseNotesRef = useRef<HTMLDivElement | null>(null);
@@ -208,13 +179,6 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
     } finally {
       setDownloadingId(null);
     }
-  };
-
-  const toggleSwitch = (id: string) => {
-    const next = !toggles[id];
-    setToggles((prev) => ({ ...prev, [id]: next }));
-    const label = TOGGLES.find((t) => t.id === id)?.label ?? id;
-    onShowToast(`${label}: ${next ? "ON" : "OFF"}`, next ? "ok" : "warn");
   };
 
   const handleShowBuildInfo = async () => {
@@ -388,7 +352,7 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
           </div>
         </div>
 
-        {/* Channel grid + toggles */}
+        {/* Channel grid + distribution policy (read-only) */}
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <div className="ep-channel-grid">
             {(releases?.channels ?? []).map((ch) => (
@@ -429,37 +393,28 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
             ))}
           </div>
 
-          {/* Toggles */}
-          <div className="ep-panel">
+          {/* Read-only policy: console-side controls were removed because they
+              had no effect on the Editor (see docs/architecture/apps-distribution-settings.md). */}
+          <div className="ep-panel" data-testid="distribution-policy">
             <div className="ep-panel-head">
-              <h3>配布設定</h3>
+              <h3>配布ポリシー</h3>
             </div>
             <div className="ep-panel-body">
-              {TOGGLES.map((t) => (
-                <div
-                  key={t.id}
-                  className="ep-opt-row"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => toggleSwitch(t.id)}
-                >
-                  <div className="lbl">
-                    {t.label}
-                    <small>{t.sub}</small>
-                  </div>
-                  <div
-                    className={`ep-toggle${toggles[t.id] ? " on" : ""}`}
-                    role="switch"
-                    aria-checked={toggles[t.id]}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleSwitch(t.id);
-                      }
-                    }}
-                  />
+              <div className="ep-opt-row">
+                <div className="lbl">
+                  自動アップデート
+                  <small>
+                    Editor
+                    本体の署名付き自動更新で適用（このコンソールからは制御しません）
+                  </small>
                 </div>
-              ))}
+              </div>
+              <div className="ep-opt-row">
+                <div className="lbl">
+                  診断ログ
+                  <small>端末内保存・オプトイン・外部送信なし</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>

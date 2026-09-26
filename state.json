@@ -388,8 +388,8 @@
     "[保留/macOS] PDF Editor の macOS 配布は後日対応（ペンディング, 2026-09-26 決定）。再開時: Developer ID 署名・notarization・.dmg/.pkg 要否を確認し apps.py の _PENDING_PLATFORMS から _build_packages へ戻す",
     "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）",
     "[人間作業] 本番 env に APPS_RELEASE_BASE_URL（editor-v1.12.6）と APPS_SHA256_WIN_EXE/MSI を設定し compose 再ビルド（Release は 2026-09-26 公開・検証済み）",
-    "[要判断] 配布設定トグルの扱い（案A 撤去 / 案C Editor 連携）— docs/architecture/apps-distribution-settings.md",
-    "[要承認] マージ済みブランチ 15 件の削除 — reports/branch-inventory-20260926.md"
+    "[要確認] fix/production-reliability-hardening-20260918（未 push・#136 取り込み済み推定）の差分確認後に削除",
+    "[人間作業] GitHub PAT に Workflows: Read and write を付与 → ci.yml に ruff check tests/ scripts/ を追加する PR"
   ],
   "learning": {
     "failure_patterns": [

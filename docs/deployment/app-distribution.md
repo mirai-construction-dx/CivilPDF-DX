@@ -151,6 +151,6 @@ https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/editor-v1
 - 📊 チャンネルの `user_count` は実測していないため `0` を返します（推測値を表示しない方針）。
 - 📊 「展開対象」「展開率/バージョン統一率」などの KPI は **MDM 未連携のデモ表示**（UI に「デモ」明示）。
   実数値表示には Intune 連携の実装が必要（別 Issue 候補）。
-- ⚙️ 配信ページの「配布設定」トグル（自動アップデート等）は UI 上の表示のみで、サーバーへ保存されません（別 Issue 候補）。
+- ⚙️ 配信ページの「配布設定」トグルは、Editor に効かないため撤去した（2026-09-26・案 A）。代わりに読み取り専用の「配布ポリシー」を表示する。経緯と今後の選択肢は [設計メモ](../architecture/apps-distribution-settings.md)
 - 🔗 ダウンロードは `APPS_RELEASE_BASE_URL` 設定後に有効化（未設定時は「近日公開予定」）。
   設定済みでもアセット未公開・非公開化ではリンクが 404 になるため、`scripts/check-editor-assets.py` で確認する。

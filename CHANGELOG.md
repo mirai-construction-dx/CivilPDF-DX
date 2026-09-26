@@ -15,7 +15,8 @@
 - 🖥️ LandingView の実測でない数値（1,284 / 248 / 97.3% / 6）を機能の事実表示へ置換。AppsView の全カードで Space 押下時に preventDefault
 - 🧹 tests/ の未使用 import 16 件を解消（CI の ruff 対象への `tests/` `scripts/` 追加は workflow 権限が必要なため別途適用）
 - 🔒 vitest 4.1.9 → 4.1.11（GHSA-82fw-gwwq-j7x9 / CWE-22、dev 依存のみ）で `npm audit` 0 件
-- 📄 設計メモ `docs/architecture/apps-distribution-settings.md`（配布設定トグルの扱い・要判断）、runbook §4.3、ブランチ棚卸しレポート
+- ⚙️ 配信ページの「配布設定」トグル（Editor に効かない UI だけのスイッチ）を撤去し、読み取り専用の「配布ポリシー」表示へ（案 A・ユーザー決定）
+- 📄 設計メモ `docs/architecture/apps-distribution-settings.md`（案 A 採用を記録）、runbook §4.3、ブランチ棚卸しレポート
 
 ### 2026-09-26 (13) — PDF Editor 配布元を本リポジトリ Releases（editor-v1.12.6）へ移行・表示版を v1.12.6 へ更新
 

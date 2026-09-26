@@ -254,6 +254,15 @@ describe("AppsView", () => {
     );
   });
 
+  it("shows a read-only distribution policy instead of ineffective toggles", async () => {
+    renderView();
+    const panel = await screen.findByTestId("distribution-policy");
+    expect(panel).toHaveTextContent("配布ポリシー");
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByText("配布設定")).toBeNull();
+    expect(screen.queryByText("テレメトリー収集")).toBeNull();
+  });
+
   it("marks deploy targets and KPI as demo data", async () => {
     renderView();
     await waitFor(() => {
