@@ -166,7 +166,9 @@ describe("PrivacyView", () => {
     const props = renderView();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "データエクスポート" }));
+    await user.click(
+      screen.getByRole("button", { name: "データエクスポート" }),
+    );
     await user.click(screen.getByRole("button", { name: "データを取得" }));
 
     await waitFor(() => {

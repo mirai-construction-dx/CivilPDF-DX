@@ -241,7 +241,9 @@ export function Settings() {
               </p>
             )}
             {changePassMutation.isSuccess && (
-              <p role="status" className="text-green-600 text-xs">パスワードを変更しました</p>
+              <p role="status" className="text-green-600 text-xs">
+                パスワードを変更しました
+              </p>
             )}
             <div className="flex gap-2">
               <button

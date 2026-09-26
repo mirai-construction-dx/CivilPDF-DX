@@ -113,8 +113,7 @@ export const M365View: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
       let detail = "接続テストに失敗しました";
       if (err instanceof AxiosError) {
         const data = err.response?.data as
-          | { detail?: M365TestConnectionResult | string }
-          | undefined;
+          { detail?: M365TestConnectionResult | string } | undefined;
         const d = data?.detail;
         if (d && typeof d === "object") {
           stage = d.stage ?? stage;

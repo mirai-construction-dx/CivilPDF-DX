@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react'
-import { fetchDocumentBlob } from '../api/documents'
+import { useEffect, useState } from "react";
+import { fetchDocumentBlob } from "../api/documents";
 
 export interface DocumentPreviewModalProps {
-  documentId: string | null
-  filename?: string
-  title?: string
-  onClose: () => void
+  documentId: string | null;
+  filename?: string;
+  title?: string;
+  onClose: () => void;
 }
 
 function isPdfFilename(filename?: string): boolean {
-  if (!filename) return false
-  return filename.toLowerCase().endsWith('.pdf')
+  if (!filename) return false;
+  return filename.toLowerCase().endsWith(".pdf");
 }
 
 export function DocumentPreviewModal({
@@ -19,48 +19,48 @@ export function DocumentPreviewModal({
   title,
   onClose,
 }: DocumentPreviewModalProps) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const previewable = isPdfFilename(filename)
+  const previewable = isPdfFilename(filename);
 
   useEffect(() => {
-    if (!documentId || !previewable) return
-    let revoked = false
-    let createdUrl: string | null = null
+    if (!documentId || !previewable) return;
+    let revoked = false;
+    let createdUrl: string | null = null;
 
     fetchDocumentBlob(documentId)
       .then((blob) => {
-        if (revoked) return
-        createdUrl = URL.createObjectURL(blob)
-        setObjectUrl(createdUrl)
+        if (revoked) return;
+        createdUrl = URL.createObjectURL(blob);
+        setObjectUrl(createdUrl);
       })
       .catch((e: unknown) => {
-        if (revoked) return
-        setError(e instanceof Error ? e.message : 'プレビューに失敗しました')
+        if (revoked) return;
+        setError(e instanceof Error ? e.message : "プレビューに失敗しました");
       })
       .finally(() => {
-        if (!revoked) setLoading(false)
-      })
+        if (!revoked) setLoading(false);
+      });
 
     return () => {
-      revoked = true
-      if (createdUrl) URL.revokeObjectURL(createdUrl)
-      setObjectUrl(null)
-    }
-  }, [documentId, previewable])
+      revoked = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+      setObjectUrl(null);
+    };
+  }, [documentId, previewable]);
 
   useEffect(() => {
-    if (!documentId) return
+    if (!documentId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [documentId, onClose])
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [documentId, onClose]);
 
-  if (!documentId) return null
+  if (!documentId) return null;
 
   return (
     <div
@@ -76,7 +76,7 @@ export function DocumentPreviewModal({
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="font-semibold text-gray-800 truncate">
-            {title || filename || 'プレビュー'}
+            {title || filename || "プレビュー"}
           </h2>
           <button
             onClick={onClose}
@@ -103,7 +103,7 @@ export function DocumentPreviewModal({
           ) : objectUrl ? (
             <iframe
               src={objectUrl}
-              title={title || filename || 'PDF preview'}
+              title={title || filename || "PDF preview"}
               // 同一オリジンの Blob のみ表示。PDF ビューアの描画に必要な
               // allow-scripts / allow-same-origin に限定し、トップナビゲーション等は禁止する。
               sandbox="allow-scripts allow-same-origin"
@@ -113,5 +113,5 @@ export function DocumentPreviewModal({
         </div>
       </div>
     </div>
-  )
+  );
 }

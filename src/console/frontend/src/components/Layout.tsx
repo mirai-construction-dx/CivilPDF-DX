@@ -1,22 +1,22 @@
-import { Outlet, NavLink, useNavigate } from 'react-router'
-import { useAuthStore } from '../store/auth'
+import { Outlet, NavLink, useNavigate } from "react-router";
+import { useAuthStore } from "../store/auth";
 
 const navItems = [
-  { to: '/dashboard', label: 'ダッシュボード' },
-  { to: '/documents', label: 'ドキュメント' },
-  { to: '/projects', label: 'プロジェクト' },
-  { to: '/workflows', label: '承認ワークフロー' },
-  { to: '/users', label: 'ユーザー管理' },
-  { to: '/audit-logs', label: '監査ログ' },
-]
+  { to: "/dashboard", label: "ダッシュボード" },
+  { to: "/documents", label: "ドキュメント" },
+  { to: "/projects", label: "プロジェクト" },
+  { to: "/workflows", label: "承認ワークフロー" },
+  { to: "/users", label: "ユーザー管理" },
+  { to: "/audit-logs", label: "監査ログ" },
+];
 
 export function Layout() {
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   function handleLogout() {
-    logout()
-    navigate('/login')
+    logout();
+    navigate("/login");
   }
 
   return (
@@ -32,7 +32,7 @@ export function Layout() {
               to={item.to}
               className={({ isActive }) =>
                 `block px-4 py-2 text-sm hover:bg-blue-800 transition-colors ${
-                  isActive ? 'bg-blue-700 font-semibold' : ''
+                  isActive ? "bg-blue-700 font-semibold" : ""
                 }`
               }
             >
@@ -41,7 +41,7 @@ export function Layout() {
           ))}
         </nav>
         <div className="px-4 py-4 border-t border-blue-700 text-sm">
-          <p className="text-blue-300 truncate">{user?.email ?? ''}</p>
+          <p className="text-blue-300 truncate">{user?.email ?? ""}</p>
           <button
             onClick={handleLogout}
             className="mt-2 text-blue-200 hover:text-white underline text-xs"
@@ -54,5 +54,5 @@ export function Layout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }
