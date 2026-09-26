@@ -22,10 +22,20 @@ export interface ChannelInfo {
   user_count: number;
 }
 
+// Platforms announced but not yet distributed (e.g. macOS: 後日対応).
+export interface PendingPlatform {
+  platform: string;
+  label: string;
+  status: "pending";
+  note: string;
+}
+
 export interface AppsReleasesResponse {
   stable_version: string;
   packages: ReleasePackage[];
   channels: ChannelInfo[];
+  // Additive field; optional so older backends without it still type-check.
+  pending_platforms?: PendingPlatform[];
 }
 
 export interface DownloadUrlResponse {

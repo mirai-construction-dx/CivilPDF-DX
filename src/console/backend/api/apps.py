@@ -4,6 +4,9 @@ Source of truth: the public GitHub Release of CivilPDF-Editor (Tauri v2 desktop 
 
     https://github.com/Kensan196948G/CivilPDF-Editor/releases/tag/v1.2.4
 
+Distribution scope: Windows only. macOS is deferred (pending, reported via
+`pending_platforms`); Linux assets exist on the Release but are not distributed.
+
 This module intentionally avoids fabricated metadata. Values that are not measured
 (e.g. active user counts) are reported honestly (0 / None) rather than guessed.
 """
@@ -61,10 +64,18 @@ class ChannelInfo(BaseModel):
     user_count: int
 
 
+class PendingPlatform(BaseModel):
+    platform: str
+    label: str
+    status: Literal["pending"]
+    note: str
+
+
 class AppsReleasesResponse(BaseModel):
     stable_version: str
     packages: list[ReleasePackage]
     channels: list[ChannelInfo]
+    pending_platforms: list[PendingPlatform] = []
 
 
 class DownloadUrlResponse(BaseModel):
@@ -139,6 +150,8 @@ def _build_packages() -> list[ReleasePackage]:
     release version because package.json / tauri.conf.json are bumped before the
     CI build, so filenames are derived from _VERSION here to prevent drift.
     The download URL is then `{APPS_RELEASE_BASE_URL}/{filename}`.
+
+    Only Windows packages are distributed; macOS is listed in _PENDING_PLATFORMS.
     """
     return [
         _pkg(
@@ -157,39 +170,19 @@ def _build_packages() -> list[ReleasePackage]:
             f"CivilPDF.Editor_{_VERSION}_x64_en-US.msi",
             "約 2.4 MB",
         ),
-        _pkg(
-            "mac-dmg",
-            "macos",
-            "dmg",
-            "ディスクイメージ (.dmg / Universal)",
-            f"CivilPDF.Editor_{_VERSION}_universal.dmg",
-            "約 4.5 MB",
-        ),
-        _pkg(
-            "linux-deb",
-            "linux",
-            "deb",
-            "Debian / Ubuntu (.deb)",
-            f"CivilPDF.Editor_{_VERSION}_amd64.deb",
-            "約 2.3 MB",
-        ),
-        _pkg(
-            "linux-appimage",
-            "linux",
-            "appimage",
-            "AppImage (.AppImage)",
-            f"CivilPDF.Editor_{_VERSION}_amd64.AppImage",
-            "約 80 MB",
-        ),
-        _pkg(
-            "linux-rpm",
-            "linux",
-            "rpm",
-            "Fedora / RHEL (.rpm)",
-            f"CivilPDF.Editor-{_VERSION}-1.x86_64.rpm",
-            "約 2.3 MB",
-        ),
     ]
+
+
+# Platforms announced but not yet distributed. Reported so the UI can say
+# "後日対応" instead of silently omitting them.
+_PENDING_PLATFORMS: list[PendingPlatform] = [
+    PendingPlatform(
+        platform="macos",
+        label="macOS",
+        status="pending",
+        note="後日対応（ペンディング）。現在は Windows 版のみ提供しています",
+    ),
+]
 
 
 _CHANNELS: list[ChannelInfo] = [
@@ -202,7 +195,8 @@ _CHANNELS: list[ChannelInfo] = [
             "安定版。テキスト編集モード（v1.2.4 新機能）・注釈（Phase A）・"
             "検索/しおり/透かし/メタデータ（Phase B）・"
             "画像→PDF/比較/フォーム（Phase C）を搭載。"
-            "未署名ビルドのため OS のセキュリティ警告が表示される場合があります。"
+            "Windows 版のみ提供（macOS は後日対応）。"
+            "未署名ビルドのため Windows SmartScreen の警告が表示される場合があります。"
         ),
         user_count=0,
     ),
@@ -285,7 +279,11 @@ _RELEASE_NOTES: list[ReleaseNote] = [
             ),
             ReleaseNoteItem(
                 type="NOTE",
-                text="未署名ビルド。Windows SmartScreen / macOS Gatekeeper の警告が表示される場合があります",
+                text="未署名ビルド。Windows SmartScreen の警告が表示される場合があります",
+            ),
+            ReleaseNoteItem(
+                type="NOTE",
+                text="配布は Windows 版のみ（macOS は後日対応・ペンディング）",
             ),
         ],
         highlights=(
@@ -316,7 +314,8 @@ _RELEASE_NOTES: list[ReleaseNote] = [
             "- 大判図面（M4）: A0/A1 タイル表示\n"
             "- レビューワークフロー: 承認・却下スタンプ・非破壊保存\n\n"
             "技術スタック: Tauri v2（システムの WebView を利用）\n"
-            "注意: 未署名ビルドのため、OS のセキュリティ警告が表示される場合があります。"
+            "対応 OS: Windows 10 / 11 (64bit)。macOS は後日対応（ペンディング）。\n"
+            "注意: 未署名ビルドのため、Windows SmartScreen の警告が表示される場合があります。"
         ),
     ),
 ]
@@ -329,6 +328,7 @@ def get_releases(_: User = Depends(get_current_user)) -> AppsReleasesResponse:
         stable_version=f"v{_VERSION}",
         packages=_build_packages(),
         channels=_CHANNELS,
+        pending_platforms=_PENDING_PLATFORMS,
     )
 
 
@@ -358,11 +358,7 @@ def get_build_info(_: User = Depends(get_current_user)) -> BuildInfo:
         build_date=os.getenv("APPS_BUILD_DATE") or None,
         channel="stable",
         runtime="Tauri v2（システムの WebView を利用）",
-        supported_os=[
-            "Windows 10 / 11 (64bit)",
-            "macOS 13 Ventura+ (Universal)",
-            "Linux (.deb / .AppImage / .rpm, x86_64)",
-        ],
+        supported_os=["Windows 10 / 11 (64bit)"],
         min_supported_version=os.getenv("APPS_MIN_SUPPORTED_VERSION", _VERSION),
     )
 

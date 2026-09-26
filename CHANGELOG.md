@@ -8,6 +8,25 @@
 
 ## [Unreleased]
 
+### 2026-09-26 (12) — PDF Editor 配布を Windows のみへ限定・macOS を後日対応（ペンディング）化
+
+- 🪟 `/api/v1/apps/releases` のパッケージを `win-exe` / `win-msi` の 2 種に限定。`mac-dmg` / `linux-*` のダウンロードは 404
+- ⏸️ `pending_platforms` フィールドを追加（後方互換の追加のみ）— macOS を「後日対応（ペンディング）」として返却
+- 🔧 `build-info.supported_os` を `Windows 10 / 11 (64bit)` のみに。リリースノート・チャンネル説明から Gatekeeper 記載を削除し Windows 限定配布を明記
+- 🖥️ 配信ページ（AppsView）: Windows 2 形式 + macOS「後日対応」カード（クリックで説明モーダル）。mockAdapter も同期
+- 📄 `docs/deployment/app-distribution.md` に配布対象 OS 表・Windows 社内展開手順（サイレント導入/削除・Intune・SHA-256 確認）・macOS 再開時の確認事項を追加
+- 🧪 backend 26・契約 4・frontend AppsView 8 件（macOS pending 表示・旧バックエンド互換を含む）
+- API 追加のみ・DB/認証/本番設定の変更なし
+
+### 2026-09-26 (11) — アプリ配信文書を実 API（CivilPDF-Editor v1.2.4 / Tauri v2）へ同期（Issue #62 連携）
+
+- 📄 `docs/deployment/app-distribution.md`・README・`.env.prod.example` に残っていた Electron 計画時の記載
+  （`win-zip` / `mac-pkg` / `ent-intune`・架空の v2.4.1・Beta/Insider チャンネル）を削除し、
+  実 API（Windows exe/msi の 2 種・macOS は後日対応・Linux は対象外）と Stable のみの運用へ是正（(12) の Windows 限定と同時適用）
+- 🧩 PDF Editor 本体の正本は別リポジトリ CivilPDF-Editor であることを明記（本リポジトリに desktop/ を作らない）
+- 🧪 `tests/console/test_apps_docs_contract.py` 追加 — 文書の package_id・ファイル名・バージョンを `api/apps.py` と照合し、再ドリフトを CI で検知
+- API・DB・認証・本番設定の変更なし
+
 ### 2026-09-18 (10) — 本番実体（compose スタック）への運用系完全移行・監視/バックアップの実障害修正
 
 #### 🚨 本番実体は compose スタックだった（旧 systemd 構成の残留と Neon の残存を発見・修正）

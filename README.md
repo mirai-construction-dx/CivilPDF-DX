@@ -86,11 +86,12 @@
 
 ### 📥 アプリ配信（PDF Editor Client）
 
-- デスクトップ版 **PDF Editor Client**（電子印鑑・OCR・大判図面）の配布窓口
-- Windows: インストーラー (.exe / .msi 選択式) / ポータブル (.zip) / Intune (.intunewin)
-- macOS: ディスクイメージ (.dmg) / インストーラー (.pkg / MDM 向け)
+- デスクトップ版 **PDF Editor Client**（電子印鑑・OCR・大判図面）の配布窓口。本体は別リポジトリ [CivilPDF-Editor](https://github.com/Kensan196948G/CivilPDF-Editor)（Tauri v2・現行 v1.2.4）
+- 🪟 **Windows のみ提供**: インストーラー (.exe / NSIS・.msi 選択式、Windows 10 / 11 64bit)
+- ⏸️ macOS: **後日対応（ペンディング）** — 配信ページに「後日対応」と表示
+- 🐧 Linux: 提供対象外
 - リリースノート・ビルド情報・SHA-256 チェックサムを配信ページで提供
-- Stable / Beta / Insider のチャンネル運用
+- Stable チャンネルのみ提供（未署名ビルド）
 - 運用手順: [docs/deployment/app-distribution.md](docs/deployment/app-distribution.md)
 
 ---

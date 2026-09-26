@@ -2,6 +2,7 @@
 
 These assert that responses reflect the real CivilPDF-Editor GitHub Release
 v1.2.4 (Tauri v2, unsigned stable, text edit mode + Phase A/B/C features included).
+Distribution scope is Windows only; macOS is reported as pending (後日対応).
 """
 
 # Real asset filenames as attached to GitHub Release v1.2.4. Filenames contain
@@ -12,11 +13,9 @@ _BASE = "https://github.com/Kensan196948G/CivilPDF-Editor/releases/download/v1.2
 _REAL_FILENAMES = {
     "win-exe": "CivilPDF.Editor_1.2.4_x64-setup.exe",
     "win-msi": "CivilPDF.Editor_1.2.4_x64_en-US.msi",
-    "mac-dmg": "CivilPDF.Editor_1.2.4_universal.dmg",
-    "linux-deb": "CivilPDF.Editor_1.2.4_amd64.deb",
-    "linux-appimage": "CivilPDF.Editor_1.2.4_amd64.AppImage",
-    "linux-rpm": "CivilPDF.Editor-1.2.4-1.x86_64.rpm",
 }
+# Assets that exist on the GitHub Release but are intentionally not distributed.
+_NOT_DISTRIBUTED = ("mac-dmg", "linux-deb", "linux-appimage", "linux-rpm")
 
 
 def _auth(token: str) -> dict:
@@ -41,15 +40,9 @@ class TestReleases:
     def test_releases_include_all_real_packages(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
         ids = {p["id"] for p in resp.json()["packages"]}
-        # Exactly the six real Tauri-generated assets — no fabricated zip/pkg/intune.
-        assert ids == {
-            "win-exe",
-            "win-msi",
-            "mac-dmg",
-            "linux-deb",
-            "linux-appimage",
-            "linux-rpm",
-        }
+        # Windows-only distribution: exactly the two real Windows installers.
+        assert ids == {"win-exe", "win-msi"}
+        assert {p["platform"] for p in resp.json()["packages"]} == {"windows"}
 
     def test_no_fabricated_packages(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
@@ -65,12 +58,12 @@ class TestReleases:
             # version field reports the release version (1.2.4), not the filename fragment.
             assert by_id[pkg_id]["version"] == "1.2.4"
 
-    def test_macos_dmg_metadata(self, client, admin_token):
+    def test_macos_reported_as_pending(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
-        pkg = next(p for p in resp.json()["packages"] if p["id"] == "mac-dmg")
-        assert pkg["platform"] == "macos"
-        assert pkg["format"] == "dmg"
-        assert pkg["filename"].endswith(".dmg")
+        pending = resp.json()["pending_platforms"]
+        assert [p["platform"] for p in pending] == ["macos"]
+        assert pending[0]["status"] == "pending"
+        assert "後日対応" in pending[0]["note"]
 
     def test_windows_msi_metadata(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
@@ -79,12 +72,10 @@ class TestReleases:
         assert pkg["format"] == "msi"
         assert pkg["filename"].endswith(".msi")
 
-    def test_linux_packages_present(self, client, admin_token):
+    def test_non_windows_packages_not_distributed(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
-        linux = {
-            p["format"] for p in resp.json()["packages"] if p["platform"] == "linux"
-        }
-        assert linux == {"deb", "appimage", "rpm"}
+        ids = {p["id"] for p in resp.json()["packages"]}
+        assert ids.isdisjoint(_NOT_DISTRIBUTED)
 
     def test_packages_unavailable_without_base_url(
         self, client, admin_token, monkeypatch
@@ -124,6 +115,9 @@ class TestReleaseNotes:
         assert "テキスト編集" in texts
         # Honest disclosure of the unsigned build limitation.
         assert "未署名" in texts
+        # Windows-only distribution is disclosed; no macOS Gatekeeper guidance.
+        assert "Windows 版のみ" in texts
+        assert "Gatekeeper" not in texts
 
     def test_notes_have_no_fabricated_content(self, client, admin_token):
         resp = client.get("/api/v1/apps/release-notes", headers=_auth(admin_token))
@@ -167,8 +161,8 @@ class TestBuildInfo:
         assert data["channel"] == "stable"
         assert "Tauri" in data["runtime"]
         assert isinstance(data["supported_os"], list) and data["supported_os"]
-        # Linux support is declared (Tauri produces .deb/.AppImage/.rpm).
-        assert any("Linux" in os_name for os_name in data["supported_os"])
+        # Windows-only distribution (macOS pending, Linux not distributed).
+        assert data["supported_os"] == ["Windows 10 / 11 (64bit)"]
         assert "min_supported_version" in data
         # build_number always present; commit/date may be None when env unset
         assert data["build_number"]
@@ -225,11 +219,22 @@ class TestDownload:
         self, client, admin_token, monkeypatch
     ):
         monkeypatch.setenv("APPS_RELEASE_BASE_URL", _BASE)
-        monkeypatch.delenv("APPS_SHA256_MAC_DMG", raising=False)
-        resp = client.get("/api/v1/apps/download/mac-dmg", headers=_auth(admin_token))
+        monkeypatch.delenv("APPS_SHA256_WIN_MSI", raising=False)
+        resp = client.get("/api/v1/apps/download/win-msi", headers=_auth(admin_token))
         assert resp.status_code == 200
         # No fabricated checksum: None when the env var is not set.
         assert resp.json()["sha256"] is None
+
+    def test_download_non_distributed_package_404(
+        self, client, admin_token, monkeypatch
+    ):
+        # Even with the base URL set, macOS/Linux assets must not be handed out.
+        monkeypatch.setenv("APPS_RELEASE_BASE_URL", _BASE)
+        for pkg_id in _NOT_DISTRIBUTED:
+            resp = client.get(
+                f"/api/v1/apps/download/{pkg_id}", headers=_auth(admin_token)
+            )
+            assert resp.status_code == 404, pkg_id
 
     def test_download_unknown_package_404(self, client, admin_token):
         resp = client.get(
