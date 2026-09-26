@@ -48,6 +48,29 @@ def get_ai_setting_row(db: Session) -> AiSetting:
     return row
 
 
+def is_ai_enabled(db: Session) -> bool:
+    """Admin kill switch: AI calls are allowed only when explicitly enabled.
+
+    Fail closed — a missing/unreadable settings row counts as disabled, so a
+    configured API key alone never turns AI on.
+    """
+    try:
+        return bool(get_ai_setting_row(db).enabled)
+    except Exception:
+        return False
+
+
+def get_model_name(db: Session, default: str) -> str:
+    """Return the configured model name, falling back to ``default``."""
+    try:
+        row = get_ai_setting_row(db)
+        if row.model_name:
+            return row.model_name
+    except Exception:
+        pass
+    return default
+
+
 def get_api_key(db: Session) -> str:
     """Return decrypted API key: DB row first, then env var fallback."""
     try:
