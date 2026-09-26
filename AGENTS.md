@@ -14,13 +14,13 @@ AI エージェント（Claude Code / Codex / OpenCode など）向けの、こ�
 | `deploy/` | systemd unit テンプレート |
 | `docs/` | 設計・運用文書（`docs/operations/runbook.md` が運用の正本） |
 
-## 検証コマンド（CI と同じ）
+## 検証コマンド（CI とほぼ同じ範囲）
 
 ```bash
 # backend（固定バージョンの venv 推奨: docs/guides/setup.md）
 ruff check src/console/backend/ tests/ scripts/
 ruff format --check src/console/backend/ tests/ scripts/
-python -m pytest -q tests
+python -m pytest -q tests   # CI は tests/console を --cov-fail-under=80 付きで、tests/integration を別に実行
 # frontend
 cd src/console/frontend && npm ci && npm run lint && npm run format:check && npm test && npm run build
 ```
@@ -32,5 +32,5 @@ cd src/console/frontend && npm ci && npm run lint && npm run format:check && npm
 - 🖥️ **本番の checkout（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）は main のまま保つ**。systemd の監視・MVP・本番 compose のビルドがこの作業ツリーから動くため、作業は `git worktree` で行う
 - 🚀 本番デプロイは人間が行う（`reports/deploy/` のチェックリストと `scripts/pre-deploy-check.sh`）
 - 📄 `docs/deployment/app-distribution.md` は契約テストで API と照合される。配布パッケージを変えたら文書も更新する
-- 🤖 AI 呼び出しは `services/ai_settings` の停止スイッチ・キー・モデル設定を必ず通す
+- 🤖 AI 呼び出しは `services/ai_settings` の停止スイッチ・キー・モデル設定を必ず通す（#151 で全経路を統一）
 - 📚 ポートフォリオ設計文書（V3.x）の正本はこのリポジトリの外にある。複製してコミットしない
