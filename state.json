@@ -388,7 +388,8 @@
     "[P3] dev 依存脆弱性（esbuild<=0.24.2 経由 vite/vitest）解消 — vite/vitest メジャー更新の影響評価込みで別 Issue 化",
     "[P3] test_workflows.py fixture isolation 修正（ローカル SQLite UNIQUE constraint 5件 — CI は green・pre-existing PR #8）",
     "[保留/macOS] PDF Editor の macOS 配布は後日対応（ペンディング, 2026-09-26 決定）。再開時: Developer ID 署名・notarization・.dmg/.pkg 要否を確認し apps.py の _PENDING_PLATFORMS から _build_packages へ戻す",
-    "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）"
+    "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）",
+    "[要実施/公開] Release editor-v1.12.6（Windows .exe/.msi）を mirai-construction-dx/CivilPDF-DX に --latest=false で作成し、本番 APPS_RELEASE_BASE_URL を差し替え → scripts/check-editor-assets.py で PASS 確認"
   ],
   "learning": {
     "failure_patterns": [

@@ -220,6 +220,25 @@ describe("AppsView", () => {
     expect(chBody).toContain("参加ユーザー数: 0");
   });
 
+  it("shows no fabricated license count or hardcoded versions", async () => {
+    renderView();
+    await screen.findByText("インストーラー (.exe / NSIS)");
+    expect(screen.queryByText(/ライセンス/)).toBeNull();
+    expect(screen.queryByText(/v1\.1\.0/)).toBeNull();
+    // KPI version delta follows the API (fixture: v1.2.0), not a literal.
+    expect(screen.getAllByText("v1.2.0").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("appends the distributed version from the API to demo target modals", async () => {
+    const user = userEvent.setup();
+    const props = renderView();
+    await screen.findByText("インストーラー (.exe / NSIS)");
+    await user.click(screen.getByText("本社ビル (東京)"));
+    const body = props.onShowModal.mock.calls.at(-1)?.[0]?.body ?? "";
+    expect(body).toContain("配布中バージョン: v1.2.0");
+    expect(body).not.toContain("v1.2.4");
+  });
+
   it("marks deploy targets and KPI as demo data", async () => {
     renderView();
     await waitFor(() => {

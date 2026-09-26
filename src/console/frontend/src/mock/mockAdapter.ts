@@ -122,7 +122,7 @@ const TOKENS = {
   token_type: "bearer",
 };
 
-const _APP_VER = "1.2.0";
+const _APP_VER = "1.12.6";
 const _mockPkg = (
   id: string,
   platform: string,
@@ -151,16 +151,16 @@ const MOCK_APPS_RELEASES = {
       "windows",
       "exe",
       "インストーラー (.exe / NSIS)",
-      "CivilPDF.Editor_1.2.0_x64-setup.exe",
-      "約 1.9 MB",
+      `CivilPDF.Editor_${_APP_VER}_x64-setup.exe`,
+      "約 39.3 MB",
     ),
     _mockPkg(
       "win-msi",
       "windows",
       "msi",
       "インストーラー (.msi)",
-      "CivilPDF.Editor_1.2.0_x64_en-US.msi",
-      "約 2.4 MB",
+      `CivilPDF.Editor_${_APP_VER}_x64_ja-JP.msi`,
+      "約 40.1 MB",
     ),
   ],
   channels: [
@@ -168,9 +168,9 @@ const MOCK_APPS_RELEASES = {
       id: "stable",
       label: "Stable",
       version: `v${_APP_VER}`,
-      release_date: "2026-06-22",
+      release_date: "2026-08-12",
       description:
-        "安定版。テキスト編集モード（v1.2.0 新機能）・注釈（Phase A）・検索/しおり/透かし/メタデータ（Phase B）・画像→PDF/比較/フォーム（Phase C）を搭載。未署名ビルドのため OS のセキュリティ警告が表示される場合があります。",
+        "安定版（mock）。自動更新・複数 PDF 一括処理・印影ライブラリを搭載。Windows 版のみ提供（macOS は後日対応）。自己署名のため SmartScreen 警告が表示される場合があります。",
       user_count: 0,
     },
   ],
@@ -189,13 +189,12 @@ const MOCK_APPS_RELEASE_NOTES = {
     {
       version: _APP_VER,
       channel: "stable",
-      release_date: "2026-06-22",
-      summary:
-        "v1.2.0 安定版 — テキスト編集モードを追加（注釈・検索・文書加工・変換機能を継続搭載）",
+      release_date: "2026-08-12",
+      summary: "v1.12.6 安定版 — Windows コード署名付きリリース（mock）",
       items: [
         {
           type: "FEAT",
-          text: "テキスト編集モード（v1.2.0: PDF 上のテキストを直接編集・PDF へ焼き込み）",
+          text: "自動更新（署名付き更新パッケージ）",
         },
         {
           type: "FEAT",
@@ -211,10 +210,10 @@ const MOCK_APPS_RELEASE_NOTES = {
         },
         {
           type: "NOTE",
-          text: "未署名ビルド。Windows SmartScreen の警告が表示される場合があります",
+          text: "自己署名のため Windows SmartScreen の警告が表示される場合があります",
         },
       ],
-      highlights: "v1.2.0 — テキスト編集モード搭載の安定版（mock）",
+      highlights: "v1.12.6 — Windows 自己署名対応の安定版（mock）",
     },
   ],
 };
@@ -224,7 +223,7 @@ const MOCK_APPS_BUILD_INFO = {
   stable_version: `v${_APP_VER}`,
   build_number: `${_APP_VER}+build.mock`,
   git_commit: "mock123",
-  build_date: "2026-04-28",
+  build_date: "2026-08-12",
   channel: "stable",
   runtime: "Tauri v2（システムの WebView を利用）",
   supported_os: ["Windows 10 / 11 (64bit)"],

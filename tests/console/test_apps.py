@@ -1,18 +1,21 @@
 """Tests for the app distribution API (releases, release notes, build info, downloads).
 
-These assert that responses reflect the real CivilPDF-Editor GitHub Release
-v1.2.4 (Tauri v2, unsigned stable, text edit mode + Phase A/B/C features included).
+These assert that responses reflect the real CivilPDF-Editor v1.12.6 release
+(Tauri v2, self-signed Windows code signing), redistributed from this repository's
+GitHub Release tag editor-v1.12.6.
 Distribution scope is Windows only; macOS is reported as pending (後日対応).
 """
 
-# Real asset filenames as attached to GitHub Release v1.2.4. Filenames contain
-# "1.2.4" matching the version set in package.json / tauri.conf.json for this
-# release. GitHub replaces spaces with dots in asset names.
+# Real Tauri asset filenames of v1.12.6 (as listed in the upstream updater
+# latest.json). GitHub replaces spaces with dots; the MSI is built for ja-JP.
 # Download URLs are `{base}/{filename}`.
-_BASE = "https://github.com/Kensan196948G/CivilPDF-Editor/releases/download/v1.2.4"
+_BASE = (
+    "https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/"
+    "editor-v1.12.6"
+)
 _REAL_FILENAMES = {
-    "win-exe": "CivilPDF.Editor_1.2.4_x64-setup.exe",
-    "win-msi": "CivilPDF.Editor_1.2.4_x64_en-US.msi",
+    "win-exe": "CivilPDF.Editor_1.12.6_x64-setup.exe",
+    "win-msi": "CivilPDF.Editor_1.12.6_x64_ja-JP.msi",
 }
 # Assets that exist on the GitHub Release but are intentionally not distributed.
 _NOT_DISTRIBUTED = ("mac-dmg", "linux-deb", "linux-appimage", "linux-rpm")
@@ -27,13 +30,13 @@ class TestReleases:
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
         assert resp.status_code == 200
         data = resp.json()
-        assert data["stable_version"] == "v1.2.4"
+        assert data["stable_version"] == "v1.12.6"
         assert isinstance(data["packages"], list)
         assert isinstance(data["channels"], list)
-        # Only the stable channel exists for v1.2.4.
+        # Only the stable channel exists.
         assert len(data["channels"]) == 1
         assert data["channels"][0]["id"] == "stable"
-        assert data["channels"][0]["version"] == "v1.2.4"
+        assert data["channels"][0]["version"] == "v1.12.6"
         # user_count is not measured, so it is reported as 0 (no fabrication).
         assert data["channels"][0]["user_count"] == 0
 
@@ -55,8 +58,8 @@ class TestReleases:
         by_id = {p["id"]: p for p in resp.json()["packages"]}
         for pkg_id, filename in _REAL_FILENAMES.items():
             assert by_id[pkg_id]["filename"] == filename
-            # version field reports the release version (1.2.4), not the filename fragment.
-            assert by_id[pkg_id]["version"] == "1.2.4"
+            # version field reports the release version, not the filename fragment.
+            assert by_id[pkg_id]["version"] == "1.12.6"
 
     def test_macos_reported_as_pending(self, client, admin_token):
         resp = client.get("/api/v1/apps/releases", headers=_auth(admin_token))
@@ -101,7 +104,7 @@ class TestReleaseNotes:
         notes = resp.json()["notes"]
         assert len(notes) == 1
         first = notes[0]
-        assert first["version"] == "1.2.4"
+        assert first["version"] == "1.12.6"
         assert first["channel"] == "stable"
         assert all("type" in i and "text" in i for i in first["items"])
 
@@ -111,10 +114,12 @@ class TestReleaseNotes:
         # Real features: PDF viewing (M1) and electronic seal (M2).
         assert "PDF 表示" in texts
         assert "電子印鑑" in texts
-        # v1.2.4 headline feature: text edit mode.
+        # Carried-over text edit mode and v1.12 auto-update.
         assert "テキスト編集" in texts
-        # Honest disclosure of the unsigned build limitation.
-        assert "未署名" in texts
+        assert "自動更新" in texts
+        # Honest disclosure: self-signed code signing still triggers SmartScreen.
+        assert "自己署名" in texts
+        assert "SmartScreen" in texts
         # Windows-only distribution is disclosed; no macOS Gatekeeper guidance.
         assert "Windows 版のみ" in texts
         assert "Gatekeeper" not in texts
@@ -157,7 +162,7 @@ class TestBuildInfo:
         assert resp.status_code == 200
         data = resp.json()
         assert data["product"] == "CivilPDF Editor Client"
-        assert data["stable_version"] == "v1.2.4"
+        assert data["stable_version"] == "v1.12.6"
         assert data["channel"] == "stable"
         assert "Tauri" in data["runtime"]
         assert isinstance(data["supported_os"], list) and data["supported_os"]
@@ -171,13 +176,13 @@ class TestBuildInfo:
         # Env is read at request time, so monkeypatch alone takes effect.
         monkeypatch.setenv("APPS_BUILD_COMMIT", "abc1234")
         monkeypatch.setenv("APPS_BUILD_DATE", "2026-06-22")
-        monkeypatch.setenv("APPS_BUILD_NUMBER", "1.2.4+build.42")
+        monkeypatch.setenv("APPS_BUILD_NUMBER", "1.12.6+build.42")
         resp = client.get("/api/v1/apps/build-info", headers=_auth(admin_token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["git_commit"] == "abc1234"
         assert data["build_date"] == "2026-06-22"
-        assert data["build_number"] == "1.2.4+build.42"
+        assert data["build_number"] == "1.12.6+build.42"
 
     def test_requires_auth(self, client):
         resp = client.get("/api/v1/apps/build-info")
