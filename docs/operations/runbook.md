@@ -182,6 +182,8 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 
 ## 7.1 オフサイトバックアップ（Phase 1）
 
+> ℹ️ 2026-09-26 時点で `deploy/civilpdf-offsite-backup.service` は**未導入**（`install-systemd.sh` の対象外・本番では稼働していない）。導入するときは unit を個別にインストールし、timer を有効化する。
+
 - ローカルバックアップ（§3）に加え、rclone で Cloudflare R2 / S3 へ同期可能
 - 設定: `CIVILPDF_RCLONE_REMOTE=civildx-r2:civilpdf-backups` を `~/.config/civilpdf/civilpdf.env` に追加し、`rclone config` で remote を事前作成
 - 手動実行: `./scripts/backup-offsite.sh`

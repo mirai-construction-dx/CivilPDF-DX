@@ -183,6 +183,10 @@ describe("ViewerView", () => {
       "選択中の文書の検査結果ではありません",
     );
     expect(screen.getByText("チェック結果（サンプル）")).toBeInTheDocument();
+    // The tab badge must not show sample NG/warning counts as if real.
+    const checkTab = screen.getByRole("tab", { name: /チェック/ });
+    expect(checkTab).toHaveTextContent("デモ");
+    expect(checkTab.textContent).not.toMatch(/\d/);
   });
 
   it("gracefully falls back to demo mode when API call fails", async () => {

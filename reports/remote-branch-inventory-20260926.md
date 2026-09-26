@@ -23,6 +23,8 @@
 
 ## ✅ PR マージ済み 27 件
 
+補足: `feat/ai-settings-ui` / `feat/phase10-readme-redesign` / `feat/phase9-quality-improvements` の 3 件は、マージした PR の head より後に commit が 1 件ずつ push されている。中身はどれも `chore(state)` による state.json の更新だけなので、削除して問題ないと判断した。
+
 | ブランチ                               | 最終 commit | PR        |
 | -------------------------------------- | ----------- | --------- |
 | feat/phase2-alembic-docker-enhanced-ui | 2026-05-11  | 5 MERGED  |

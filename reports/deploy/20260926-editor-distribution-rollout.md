@@ -20,10 +20,19 @@ migration、DB、認証への変更はありません。
 - [ ] その checkout が **`main` の検証済み commit** になっていること。compose のビルド元はこの作業ツリーなので、feature branch のままビルドするとそのコードが本番に入る
   ```bash
   cd ~/Projects/Mirai-Construction-DX/CivilPDF-DX
+  git status --short
+  #   M state.json               → hook の実行ログ。次の行で退避してから pull する
+  #   ?? .mvp-data.bak-20260923/  → 無視してよい（Git 管理外）
+  #   それ以外の追跡ファイルに変更がある場合は中止して確認する
+  git stash push -m "pre-deploy-state" state.json 2>/dev/null || true
   git switch main && git pull --ff-only origin main && git log --oneline -1
-  git status --short   # 追跡ファイルに変更がないこと（.env は Git 管理外なので表示されない）
   ```
 - [ ] バックアップを取る: `./scripts/backup-production.sh`
+- [ ] **ロールバック用に、今のイメージへタグを付けておく**（今のイメージは 2026-09-18 ビルドで、コードは `cf84389` 相当）:
+  ```bash
+  docker tag civilpdf-dx-backend:latest  civilpdf-dx-backend:pre-20260926
+  docker tag civilpdf-dx-frontend:latest civilpdf-dx-frontend:pre-20260926
+  ```
 - [ ] 配布アセットが公開済みであることを確認する（2026-09-26 時点で PASS 確認済み）:
   ```bash
   APPS_SHA256_WIN_EXE=e9ba1a2625b7c2479cd25993fa510fcd2eb34b81a265bdf0a5cd349b7772e094 \
@@ -42,7 +51,8 @@ APPS_SHA256_WIN_EXE=e9ba1a2625b7c2479cd25993fa510fcd2eb34b81a265bdf0a5cd349b7772
 APPS_SHA256_WIN_MSI=ed3ef5d76d48be0d696e9642a1ed15f1eeef5c0b432bd438f64cdb7b4795db04
 ```
 
-⚠️ env の更新とイメージの再ビルドは**続けて**行う。env だけ新しいタグにすると、旧イメージのファイル名（v1.2.4）で判定されて、日次監視が「リンク異常」を通知する。
+⚠️ `.env` を編集しただけでは稼働中のコンテナには反映されない（`env_file` はコンテナを作り直したときに読み込まれる）。
+env を変えたら、**必ず次の手順 2 の `--build` 付きで作り直す**。`docker compose up -d`（`--build` なし）や `restart` で作り直すと、新しい env と旧イメージ（v1.2.4 のファイル名）が組み合わさり、配信ページが 404 リンクを出して、日次監視も「リンク異常」を通知する。
 
 補足: `.env` のパーミッションは現在 `700`。secret を含むファイルなので `chmod 600 .env` を推奨。
 
@@ -62,7 +72,7 @@ docker compose -f docker-compose.prod.yml ps        # 3 サービスとも healt
   ```
 - [ ] 配布リンク監視を手動で実行し、`ok` が出る:
   ```bash
-  ./scripts/editor-asset-watch.sh --force && tail -1 ~/.local/state/civildx-monitor/monitor.log
+  ./scripts/editor-asset-watch.sh --force && grep editor-assets ~/.local/state/civildx-monitor/monitor.log | tail -1
   ```
 - [ ] ブラウザで `/apps` を開き、次を確認する:
   - Windows の 2 形式が「ダウンロード可能」になっている
@@ -73,9 +83,28 @@ docker compose -f docker-compose.prod.yml ps        # 3 サービスとも healt
 
 ## ↩️ ロールバック
 
-1. `.env` の `APPS_RELEASE_BASE_URL` を空に戻す（「近日公開予定」表示に戻る）
-2. コードも戻す場合は、直前の commit（例 `763fb2c`）を checkout して `docker compose -f docker-compose.prod.yml up -d --build`
-3. DB の変更はないので、データの復旧は不要
+**A. 表示だけを「近日公開予定」に戻す**（コードは新しいまま）
+
+1. `.env` の `APPS_RELEASE_BASE_URL` を空に戻す
+2. `docker compose -f docker-compose.prod.yml up -d` でコンテナを作り直す（**これをしないと env の変更は反映されない**）
+
+**B. 反映前のイメージに戻す**（推奨。事前確認で付けたタグを使う）
+
+```bash
+docker tag civilpdf-dx-backend:pre-20260926  civilpdf-dx-backend:latest
+docker tag civilpdf-dx-frontend:pre-20260926 civilpdf-dx-frontend:latest
+# .env の APPS_* を反映前の値（APPS_RELEASE_BASE_URL は空）に戻してから:
+docker compose -f docker-compose.prod.yml up -d --no-build
+```
+
+- 作業ツリーは main のままにする（systemd の monitor などもこのツリーから動くため、checkout を切り替えない）
+- ソースから再ビルドして戻す必要がある場合、反映前の本番に相当する commit は **`cf84389`**。`763fb2c` などには #141 以降の変更が入っているので使わない。その場合は `git worktree` で別ディレクトリに展開してビルドし、作業ツリーは main のまま保つ
+
+DB の変更はないので、どちらの場合もデータの復旧は不要。
+
+## 🧩 任意（反映後）
+
+- インストール済み unit の `Documentation=` はまだ旧 URL（`Kensan196948G/...`）。動作には影響しないが、`./deploy/install-systemd.sh` を実行し直すと揃う（テンプレートは #145 で現行パスに修正済み）
 
 ## 🧾 記録
 
