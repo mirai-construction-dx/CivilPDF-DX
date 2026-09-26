@@ -8,6 +8,16 @@
 
 ## [Unreleased]
 
+### 2026-09-26 (13) — PDF Editor 配布元を本リポジトリ Releases（editor-v1.12.6）へ移行・表示版を v1.12.6 へ更新
+
+- 🚨 旧配布元 `Kensan196948G/CivilPDF-Editor/releases/download/v1.2.4` が 404（リポジトリ非公開化）で、配信ページのダウンロードが壊れていた
+- 🌐 配布元を public の本リポジトリ Releases・Editor 専用タグ `editor-v<版>` へ変更（コンソールの `v0.x` と区別、`--latest=false` で公開）
+- 🔢 表示版を実配布版 v1.12.6（2026-08-12）へ更新。MSI 実名は `_x64_ja-JP.msi`、サイズは実測（約 39.3 / 40.1 MB）
+- 📝 リリースノート・チャンネル説明を v1.3〜v1.12.6 の実変更（自動更新・自己署名コード署名・一括処理 等）へ更新。「未署名」→「自己署名」へ是正
+- 🔍 `scripts/check-editor-assets.py` 追加 — 配布アセットの到達性（HEAD）と任意で SHA-256 を検証。テストは MockTransport（外部通信なし）
+- 🖥️ AppsView: 実測でない「248 ライセンス」表示を削除、「v1.1.0 未満」固定文言と展開対象デモの固定版表示を API 連動へ。mock を v1.12.6 へ同期
+- API スキーマ・DB・認証の変更なし（版・ファイル名・文言のみ）
+
 ### 2026-09-26 (12) — PDF Editor 配布を Windows のみへ限定・macOS を後日対応（ペンディング）化
 
 - 🪟 `/api/v1/apps/releases` のパッケージを `win-exe` / `win-msi` の 2 種に限定。`mac-dmg` / `linux-*` のダウンロードは 404
