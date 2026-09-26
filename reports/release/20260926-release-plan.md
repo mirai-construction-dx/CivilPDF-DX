@@ -4,13 +4,13 @@
 
 ## 🔍 現状
 
-| 項目                      | 状態                                                                   |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `VERSION`                 | `0.9.0`（2026-08-13 の #132「MVP/Prototype 公開」で設定）              |
-| git タグ / GitHub Release | 最新は **`v0.7.0`**（2026-06-03）。`v0.8.x` と `v0.9.0` は**タグなし** |
-| `v0.9.0` 設定後の main    | 15 commit（#133〜#148）                                                |
-| CHANGELOG                 | `[Unreleased]` に 2026-06〜09 の 23 エントリーがたまっている           |
-| Editor 配布用のタグ       | `editor-v1.12.6`（コンソールの版とは別系統。`--latest=false`）         |
+| 項目                      | 状態                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERSION`                 | `0.9.0`（2026-08-13 の #132「MVP/Prototype 公開」で設定）                                                                                                                                            |
+| git タグ / GitHub Release | 最新は **`v0.7.0`**（2026-06-03）。`v0.8.x` と `v0.9.0` は**タグなし**                                                                                                                               |
+| `v0.9.0` 設定後の main    | 15 commit（#133〜#148）                                                                                                                                                                              |
+| CHANGELOG                 | `[Unreleased]` に 2026-08-06〜09-26 の日付付きエントリー 24 件（ほかに「追加」「計画中」の見出し）。`VERSION` は #121（2026-08-12）で 0.8.0、#132（2026-08-13）で 0.9.0 になったが、どちらもタグなし |
+| Editor 配布用のタグ       | `editor-v1.12.6`（コンソールの版とは別系統。`--latest=false`）                                                                                                                                       |
 
 ## 📦 #133〜#148 の主な変更（semver 観点）
 
@@ -19,7 +19,7 @@
 - 🗄️ 運用: 本番 DB を Neon からローカル PostgreSQL へ移行（#136）
 - 🔒 セキュリティ・品質: 依存パッケージの脆弱性 0 件、テスト DB の分離、CI の lint 対象拡大
 
-→ 後方互換の機能追加が中心なので、**minor バージョンを上げる**のが妥当。
+→ **破壊的変更を含む**（`mac-dmg` / `linux-*` のダウンロード ID の廃止＝404、配布設定トグルの撤去、本番 DB の移行）。0.x 系では破壊的変更も minor で上げるのが semver の慣習なので、**minor（0.10.0）に上げ、CHANGELOG と Release 本文に BREAKING 節を必ず設ける**。
 
 ## 🧭 選択肢
 
@@ -31,10 +31,10 @@
 
 ## ✅ 案 A の手順（承認後）
 
-1. PR: `VERSION` を `0.10.0` に、`APP_VERSION`（`.env.example` / `.env.prod.example` / `deploy/civilpdf.env.example`）と runbook の表記を更新（`verify-version-sync.sh` で整合を確認）
-2. PR: CHANGELOG の `[Unreleased]` を `## [0.10.0] — <日付>` と `## [0.9.0] — 2026-08-13` に分ける（#132 以前と以後で区切る）
+1. PR: `VERSION` を `0.10.0` に、`APP_VERSION`（`.env.example` / `.env.prod.example` / `deploy/civilpdf.env.example`）と runbook の表記を更新（`verify-version-sync.sh` で整合を確認）。あわせて**同期されていない版表記**を直す: UI のバッジ `EnterpriseLayout.tsx` の `v0.4.2 · Enterprise`（固定値）、`src/console/backend/.env.example` の `APP_VERSION=0.1.0`。`frontend/package.json` の `0.0.0`（private パッケージ）は対象外と明記する。`verify-version-sync.sh` にも UI バッジの検査を加えると再発を防げる
+2. PR: CHANGELOG の `[Unreleased]` を `## [0.10.0] — <日付>` と `## [0.9.0] — 2026-08-13` に分ける（#132 以前と以後で区切る）。0.8.0（#121・2026-08-12）は 1 日だけでタグもないため、**`[0.9.0]` に統合し、その旨を節の冒頭に書く**。`[0.10.0]` には **BREAKING** 節（ダウンロード ID の廃止・トグル撤去・本番 DB の移行）を設ける
 3. マージ後、`git tag -a v0.9.0 a73b90b` と `git tag -a v0.10.0 <merge commit>` を作って push する
-4. GitHub Release を 2 件作る（`v0.10.0` を Latest にする。`editor-v*` とは別系統）
+4. GitHub Release を 2 件作る（`v0.10.0` を Latest にする。`editor-v*` とは別系統）。`v0.10.0` の本文にも BREAKING 節を載せる
 5. 本番反映は、[反映チェックリスト](../deploy/20260926-editor-distribution-rollout.md)に従って人間が行う。`.env` の `APP_VERSION` も `0.10.0` にする
 
 ## ❓ 判断してほしいこと

@@ -134,7 +134,10 @@ def main() -> int:
 
         # App distribution: Windows-only installers, macOS announced as pending.
         apps = client.get("/api/v1/apps/releases", headers=headers)
-        body = apps.json() if apps.status_code == 200 else {}
+        try:
+            body = apps.json() if apps.status_code == 200 else {}
+        except ValueError:  # e.g. a proxy answering with the SPA's HTML
+            body = {}
         platforms = {p.get("platform") for p in body.get("packages", [])}
         pending = [p.get("platform") for p in body.get("pending_platforms", [])]
         ok = (
@@ -145,7 +148,7 @@ def main() -> int:
         check(
             "apps distribution (windows only)",
             ok,
-            f"platforms={sorted(platforms)} pending={pending}",
+            f"status={apps.status_code} platforms={sorted(platforms)} pending={pending}",
         )
 
         # RBAC: a viewer must not be able to read the admin-only audit log.

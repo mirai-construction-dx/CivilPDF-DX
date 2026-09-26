@@ -80,11 +80,11 @@ MVP 用の secret は `docker-compose.mvp.yml` に明示したダミー値のみ
 
 ```bash
 BASE_URL=https://civilpdf-mvp.mirai-dx-platform.com python scripts/mvp-smoke.py
-# 期待: [PASS] 15 項目・0 failure
+# 期待: [PASS] 16 項目・0 failure（2026-09-26 に「アプリ配布は Windows のみ」を追加）
 ```
 
 スモークは認証 → 統計 → 一覧/検索 → ワークフロー → 通知 → 監査チェーン →
-CSV 出力 → 権限棚卸し → DX 同期 → RBAC 拒否を実 HTTP で確認します。
+CSV 出力 → 権限棚卸し → DX 同期 → アプリ配布（Windows のみ・macOS は後日対応）→ RBAC 拒否を実 HTTP で確認します。
 
 ## 6. Cloudflare Tunnel（MVP 用サブドメイン）の構成
 
