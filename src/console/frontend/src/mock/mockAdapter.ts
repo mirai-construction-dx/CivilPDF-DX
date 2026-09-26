@@ -162,38 +162,6 @@ const MOCK_APPS_RELEASES = {
       "CivilPDF.Editor_1.2.0_x64_en-US.msi",
       "約 2.4 MB",
     ),
-    _mockPkg(
-      "mac-dmg",
-      "macos",
-      "dmg",
-      "ディスクイメージ (.dmg / Universal)",
-      "CivilPDF.Editor_1.2.0_universal.dmg",
-      "約 4.5 MB",
-    ),
-    _mockPkg(
-      "linux-deb",
-      "linux",
-      "deb",
-      "Debian / Ubuntu (.deb)",
-      "CivilPDF.Editor_1.2.0_amd64.deb",
-      "約 2.3 MB",
-    ),
-    _mockPkg(
-      "linux-appimage",
-      "linux",
-      "appimage",
-      "AppImage (.AppImage)",
-      "CivilPDF.Editor_1.2.0_amd64.AppImage",
-      "約 80 MB",
-    ),
-    _mockPkg(
-      "linux-rpm",
-      "linux",
-      "rpm",
-      "Fedora / RHEL (.rpm)",
-      "CivilPDF.Editor-1.2.0-1.x86_64.rpm",
-      "約 2.3 MB",
-    ),
   ],
   channels: [
     {
@@ -204,6 +172,14 @@ const MOCK_APPS_RELEASES = {
       description:
         "安定版。テキスト編集モード（v1.2.0 新機能）・注釈（Phase A）・検索/しおり/透かし/メタデータ（Phase B）・画像→PDF/比較/フォーム（Phase C）を搭載。未署名ビルドのため OS のセキュリティ警告が表示される場合があります。",
       user_count: 0,
+    },
+  ],
+  pending_platforms: [
+    {
+      platform: "macos",
+      label: "macOS",
+      status: "pending",
+      note: "後日対応（ペンディング）。現在は Windows 版のみ提供しています",
     },
   ],
 };
@@ -235,7 +211,7 @@ const MOCK_APPS_RELEASE_NOTES = {
         },
         {
           type: "NOTE",
-          text: "未署名ビルド。Windows SmartScreen / macOS Gatekeeper の警告が表示される場合があります",
+          text: "未署名ビルド。Windows SmartScreen の警告が表示される場合があります",
         },
       ],
       highlights: "v1.2.0 — テキスト編集モード搭載の安定版（mock）",
@@ -251,11 +227,7 @@ const MOCK_APPS_BUILD_INFO = {
   build_date: "2026-04-28",
   channel: "stable",
   runtime: "Tauri v2（システムの WebView を利用）",
-  supported_os: [
-    "Windows 10 / 11 (64bit)",
-    "macOS 13 Ventura+ (Universal)",
-    "Linux (.deb / .AppImage / .rpm, x86_64)",
-  ],
+  supported_os: ["Windows 10 / 11 (64bit)"],
   min_supported_version: _APP_VER,
 };
 

@@ -7,6 +7,7 @@ import {
   getBuildInfo,
   type ReleasePackage,
   type ChannelInfo,
+  type PendingPlatform,
 } from "../../../api/apps";
 
 interface ViewProps {
@@ -52,19 +53,12 @@ const CHANNEL_PILL: Record<string, string> = {
 
 // リリースごとに変わらない静的補足（対応 OS・要件・導入手順の型）。
 // バージョン・ファイル名・サイズは API (ReleasePackage) から動的に組み立てる。
+// 配布は Windows のみ（macOS は API の pending_platforms で「後日対応」表示）。
 const DL_STATIC_BODY: Record<string, (filename: string) => string> = {
   "win-exe": () =>
-    "対応OS: Windows 10 / 11 (64bit)\n必要要件: Webview2（Windows 11 は標準搭載）\n\n用途: 個人 PC への対話型インストール\n注意: 未署名ビルドのため SmartScreen 警告が表示される場合があります",
+    "対応OS: Windows 10 / 11 (64bit)\n必要要件: WebView2（Windows 11 は標準搭載）\n\n用途: 個人 PC への対話型インストール\n注意: 未署名ビルドのため SmartScreen 警告が表示される場合があります",
   "win-msi": (filename) =>
-    `対応OS: Windows 10 / 11 (64bit)\n必要要件: Webview2（Windows 11 は標準搭載）\n\n用途: グループポリシー (GPO) / SCCM によるサイレント一括展開向け\nサイレントインストール例:\n  msiexec /i ${filename} /qn`,
-  "mac-dmg": () =>
-    "対応OS: macOS 13 Ventura 以降\nApple Silicon / Intel 両対応 (Universal Binary)\n注意: 未署名ビルドのため Gatekeeper 警告が表示される場合があります",
-  "linux-deb": (filename) =>
-    `対応OS: Ubuntu 22.04+ / Debian 12+\nアーキテクチャ: x86_64\n\nインストール:\n  sudo dpkg -i ${filename}`,
-  "linux-appimage": (filename) =>
-    `インストール不要。実行権限を付与して起動可能。\n  chmod +x ${filename}\n  ./${filename}\n\n対応OS: glibc 2.31+ の Linux ディストリビューション (x86_64)`,
-  "linux-rpm": (filename) =>
-    `対応OS: Fedora 38+ / RHEL 9+ / AlmaLinux 9+\nアーキテクチャ: x86_64\n\nインストール:\n  sudo rpm -i ${filename}`,
+    `対応OS: Windows 10 / 11 (64bit)\n必要要件: WebView2（Windows 11 は標準搭載）\n\n用途: グループポリシー (GPO) / SCCM / Intune によるサイレント一括展開向け\nサイレントインストール例:\n  msiexec /i ${filename} /qn /norestart`,
 };
 
 const buildDownloadModalBody = (pkg: ReleasePackage): string => {
@@ -76,13 +70,11 @@ const buildDownloadModalBody = (pkg: ReleasePackage): string => {
   ].join("\n\n");
 };
 
-const DL_OS: Record<string, string> = {
-  "win-exe": "Windows",
-  "win-msi": "Windows",
-  "mac-dmg": "macOS",
-  "linux-deb": "Linux",
-  "linux-appimage": "Linux",
-  "linux-rpm": "Linux",
+const buildPendingModalBody = (p: PendingPlatform): string =>
+  `${p.label} 版 PDF Editor Client\n\nステータス: 後日対応（ペンディング）\n${p.note}`;
+
+const PLATFORM_LABEL: Record<string, string> = {
+  windows: "Windows",
 };
 
 const TOGGLES: ToggleItem[] = [
@@ -189,7 +181,7 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
   const handleDownload = async (pkg: ReleasePackage) => {
     if (!pkg.available) {
       onShowModal({
-        title: `${DL_OS[pkg.id] ?? pkg.platform} — ${pkg.label}`,
+        title: `${PLATFORM_LABEL[pkg.platform] ?? pkg.platform} — ${pkg.label}`,
         body: `${buildDownloadModalBody(pkg)}\n\nダウンロードリンクは近日公開予定です。`,
       });
       return;
@@ -290,7 +282,7 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
               </p>
               <div className="ep-app-meta">
                 <span>バージョン {releases?.stable_version ?? "—"}</span>
-                <span>Windows / macOS / Linux</span>
+                <span>Windows 10 / 11（macOS は後日対応）</span>
                 <span>248 ライセンス</span>
               </div>
             </div>
@@ -299,14 +291,14 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
+              gridTemplateColumns: "repeat(3, 1fr)",
               gap: "7px",
               padding: "11px 16px",
               borderTop: "1px solid var(--border)",
             }}
           >
             {releasesLoading
-              ? [0, 1, 2, 3].map((i) => (
+              ? [0, 1, 2].map((i) => (
                   <div key={i} className="ep-dl-card" style={{ opacity: 0.4 }}>
                     <div className="os">—</div>
                     <div className="fmt">読み込み中...</div>
@@ -328,7 +320,9 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                           handleDownload(pkg);
                       }}
                     >
-                      <div className="os">{DL_OS[pkg.id] ?? pkg.platform}</div>
+                      <div className="os">
+                        {PLATFORM_LABEL[pkg.platform] ?? pkg.platform}
+                      </div>
                       <div className="fmt">{pkg.label}</div>
                       <div className="size">
                         {isLoading
@@ -340,6 +334,34 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                     </div>
                   );
                 })}
+            {!releasesLoading &&
+              (releases?.pending_platforms ?? []).map((p) => (
+                <div
+                  key={p.platform}
+                  className="ep-dl-card"
+                  data-testid={`pending-${p.platform}`}
+                  onClick={() =>
+                    onShowModal({
+                      title: `${p.label} — 後日対応`,
+                      body: buildPendingModalBody(p),
+                    })
+                  }
+                  role="button"
+                  tabIndex={0}
+                  style={{ opacity: 0.55 }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      onShowModal({
+                        title: `${p.label} — 後日対応`,
+                        body: buildPendingModalBody(p),
+                      });
+                  }}
+                >
+                  <div className="os">{p.label}</div>
+                  <div className="fmt">後日対応（ペンディング）</div>
+                  <div className="size">—</div>
+                </div>
+              ))}
           </div>
           <div className="ep-app-card-actions">
             <button
