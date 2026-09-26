@@ -14,7 +14,9 @@
     "test": "node --disable-wasm-trap-handler node_modules/.bin/vitest run --config vitest.config.ts",
     "test:watch": "node --disable-wasm-trap-handler node_modules/.bin/vitest --config vitest.config.ts",
     "test:coverage": "node --disable-wasm-trap-handler node_modules/.bin/vitest run --config vitest.config.ts --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.9",
@@ -49,6 +51,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "jsdom": "^29.1.1",
+    "prettier": "3.9.9",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
