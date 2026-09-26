@@ -48,39 +48,46 @@ def get_ai_setting_row(db: Session) -> AiSetting:
     return row
 
 
+def _read_setting_row(db: Session) -> AiSetting | None:
+    """Read-only lookup for request paths (search, AI calls).
+
+    Unlike get_ai_setting_row it never inserts, and on any DB error it rolls
+    the session back so the caller's later queries still work (a failed
+    statement would otherwise leave the transaction aborted and turn an
+    unrelated search into a 500).
+    """
+    try:
+        return db.query(AiSetting).filter(AiSetting.id == 1).first()
+    except Exception:
+        db.rollback()
+        return None
+
+
 def is_ai_enabled(db: Session) -> bool:
     """Admin kill switch: AI calls are allowed only when explicitly enabled.
 
     Fail closed — a missing/unreadable settings row counts as disabled, so a
     configured API key alone never turns AI on.
     """
-    try:
-        return bool(get_ai_setting_row(db).enabled)
-    except Exception:
-        return False
+    row = _read_setting_row(db)
+    return bool(row is not None and row.enabled)
 
 
 def get_model_name(db: Session, default: str) -> str:
     """Return the configured model name, falling back to ``default``."""
-    try:
-        row = get_ai_setting_row(db)
-        if row.model_name:
-            return row.model_name
-    except Exception:
-        pass
+    row = _read_setting_row(db)
+    if row is not None and row.model_name:
+        return row.model_name
     return default
 
 
 def get_api_key(db: Session) -> str:
     """Return decrypted API key: DB row first, then env var fallback."""
-    try:
-        row = get_ai_setting_row(db)
-        if row.api_key_enc:
-            key = decrypt_key(row.api_key_enc)
-            if key:
-                return key
-    except Exception:
-        pass
+    row = _read_setting_row(db)
+    if row is not None and row.api_key_enc:
+        key = decrypt_key(row.api_key_enc)
+        if key:
+            return key
     return os.environ.get("ANTHROPIC_API_KEY", "") or settings.anthropic_api_key
 
 

@@ -218,7 +218,9 @@ def _expand_query_with_claude(query: str, db: Session) -> list[str]:
 
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model=ai_settings_service.get_model_name(db, "claude-haiku-4-5-20251001"),
+            # Query expansion runs on every semantic search: keep the small,
+            # cheap model regardless of the (possibly larger) admin setting.
+            model="claude-haiku-4-5-20251001",
             max_tokens=128,
             system=_EXPAND_SYSTEM,
             messages=[{"role": "user", "content": f"クエリ: {query}"}],

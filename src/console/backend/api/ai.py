@@ -82,6 +82,15 @@ def _get_document_text(doc: Document) -> str:
         return ""
 
 
+def _ensure_ai_enabled(db: Session) -> None:
+    """Kill switch gate — checked before any document text is extracted."""
+    if not ai_settings_service.is_ai_enabled(db):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI 機能は無効化されています（設定画面で有効化してください）",
+        )
+
+
 def _get_anthropic_client(db: Session):
     """Return Anthropic client; checks DB first, then env var fallback."""
     try:
@@ -92,11 +101,7 @@ def _get_anthropic_client(db: Session):
             detail="anthropic package not installed",
         ) from exc
 
-    if not ai_settings_service.is_ai_enabled(db):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI 機能は無効化されています（設定画面で有効化してください）",
-        )
+    _ensure_ai_enabled(db)
     api_key = ai_settings_service.get_api_key(db)
     if not api_key:
         raise HTTPException(
@@ -150,6 +155,7 @@ def classify_document(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
     _check_document_access(doc, current_user)
+    _ensure_ai_enabled(db)
 
     text = _get_document_text(doc)
     if not text:
@@ -270,6 +276,7 @@ def extract_document_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
     _check_document_access(doc, current_user)
+    _ensure_ai_enabled(db)
 
     text = _get_document_text(doc)
     if not text:
@@ -345,6 +352,7 @@ def get_document_summary(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
     _check_document_access(doc, current_user)
+    _ensure_ai_enabled(db)
 
     text = _get_document_text(doc)
     if not text:

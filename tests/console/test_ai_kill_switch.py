@@ -101,12 +101,12 @@ def test_semantic_search_does_not_call_ai_when_disabled(
     sdk.assert_not_called()
 
 
-def test_semantic_search_uses_configured_key_and_model_when_enabled(
+def test_semantic_search_uses_configured_key_when_enabled(
     client, headers, db_session, monkeypatch
 ):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     ai_settings_service.update_ai_setting(
-        db_session, enabled=True, model_name="claude-test-model"
+        db_session, enabled=True, model_name="claude-expensive-model"
     )
     message = MagicMock()
     message.content = [MagicMock(text='["橋梁", "橋"]')]
@@ -122,6 +122,74 @@ def test_semantic_search_uses_configured_key_and_model_when_enabled(
         )
     assert resp.json()["expanded_terms"] == ["橋梁", "橋"]
     sdk.assert_called_once_with(api_key="sk-db-key")
+    # Query expansion stays on the cheap model regardless of the admin setting.
     assert sdk.return_value.messages.create.call_args.kwargs["model"] == (
-        "claude-test-model"
+        "claude-haiku-4-5-20251001"
     )
+
+
+def test_enabled_without_key_keeps_search_on_the_original_query(
+    client, headers, db_session, monkeypatch
+):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _set_enabled(db_session, True)
+    with (
+        patch.object(ai_settings_service.settings, "anthropic_api_key", ""),
+        patch("anthropic.Anthropic") as sdk,
+    ):
+        resp = client.get(
+            "/api/v1/search/documents",
+            params={"q": "橋梁", "mode": "semantic"},
+            headers=headers,
+        )
+    assert resp.json()["expanded_terms"] == ["橋梁"]
+    sdk.assert_not_called()
+
+
+def test_unreadable_settings_fail_closed_without_breaking_the_request(
+    client, headers, db_session, monkeypatch
+):
+    """A DB error while reading the switch must not leave the session aborted.
+
+    Regression guard: without a rollback the following search queries on the
+    same session failed and the endpoint returned 500.
+    """
+    from sqlalchemy import text
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-used")
+    db_session.execute(text("DROP TABLE ai_settings"))
+    db_session.commit()
+    with patch("anthropic.Anthropic") as sdk:
+        resp = client.get(
+            "/api/v1/search/documents",
+            params={"q": "橋梁", "mode": "semantic"},
+            headers=headers,
+        )
+    assert resp.status_code == 200
+    assert resp.json()["expanded_terms"] == ["橋梁"]
+    sdk.assert_not_called()
+
+
+def test_request_paths_do_not_create_the_settings_row(client, headers, db_session):
+    from models.ai_setting import AiSetting
+
+    client.get(
+        "/api/v1/search/documents",
+        params={"q": "橋梁", "mode": "semantic"},
+        headers=headers,
+    )
+    assert db_session.query(AiSetting).count() == 0
+
+
+def test_read_error_rolls_back_the_session_and_fails_closed():
+    """On PostgreSQL a failed statement aborts the transaction; the lookup must
+    roll back so the caller's next query (e.g. the search itself) still runs.
+    SQLite does not abort, so this is asserted directly on the session.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    db = MagicMock()
+    db.query.side_effect = OperationalError("SELECT", {}, Exception("aborted"))
+    assert ai_settings_service.is_ai_enabled(db) is False
+    db.rollback.assert_called_once()
+    assert ai_settings_service.get_model_name(db, "fallback") == "fallback"
