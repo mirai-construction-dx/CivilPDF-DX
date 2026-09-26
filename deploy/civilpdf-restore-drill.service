@@ -4,8 +4,8 @@ Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX
-ExecStart=%h/Projects/Mirai-DX-Project/CivilPDF-DX/scripts/restore-drill.sh
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX
+ExecStart=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/scripts/restore-drill.sh
 # 復元+起動+認証フローまで含むため、systemd 既定の 90 秒では不足し得る
 TimeoutStartSec=10min
 

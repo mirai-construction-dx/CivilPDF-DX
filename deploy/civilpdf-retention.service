@@ -9,8 +9,8 @@ Type=oneshot
 # backend コンテナ内で実行する。スクリプトを /tmp へコピーしてから
 # PYTHONPATH=/app で起動する（python - の stdin 実行は __file__ が定義されず
 # retention-job.py の sys.path.insert が失敗するため）。
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX
-ExecStart=/bin/bash -c 'cd %h/Projects/Mirai-DX-Project/CivilPDF-DX && docker compose -f docker-compose.prod.yml cp scripts/retention-job.py backend:/tmp/retention-job.py && docker compose -f docker-compose.prod.yml exec -T backend sh -c "PYTHONPATH=/app python /tmp/retention-job.py --apply --grace-days 30 --json"'
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX
+ExecStart=/bin/bash -c 'cd %h/Projects/Mirai-Construction-DX/CivilPDF-DX && docker compose -f docker-compose.prod.yml cp scripts/retention-job.py backend:/tmp/retention-job.py && docker compose -f docker-compose.prod.yml exec -T backend sh -c "PYTHONPATH=/app python /tmp/retention-job.py --apply --grace-days 30 --json"'
 TimeoutStartSec=10min
 
 NoNewPrivileges=true

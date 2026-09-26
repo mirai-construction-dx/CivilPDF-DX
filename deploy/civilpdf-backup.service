@@ -4,8 +4,8 @@ Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX
-ExecStart=%h/Projects/Mirai-DX-Project/CivilPDF-DX/scripts/backup-production.sh
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX
+ExecStart=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/scripts/backup-production.sh
 # ダンプ取得+二重検証+古いスナップショットの prune まで含む。prune 中に
 # タイムアウトで SIGTERM されると「半分削除されたバックアップ」が残る
 # （2026-09-18 に実測）ため、既定 90 秒より十分大きな値を設定する。

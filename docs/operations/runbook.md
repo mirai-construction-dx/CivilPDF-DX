@@ -29,7 +29,7 @@
 
 0. リリース前確認: `./scripts/verify-version-sync.sh` で `VERSION`・env 例・文書の整合を確認
 1. バックアップ取得: `./scripts/backup-production.sh`
-2. リポジトリを main の検証済み commit へ更新（本番チェックアウトは ~/Projects/Mirai-DX-Project/CivilPDF-DX）。以降の手順（イメージ再ビルド docker compose -f docker-compose.prod.yml up -d --build、スモーク ./scripts/healthcheck-civilpdf.sh、ログ確認 docker compose logs --tail 100 backend）は compose 本番構成で実施する。旧構成（ホスト直 uvicorn 8180 / vite preview 5182）は 2026-09-18 に退役: 旧 civilpdf-backend.service は Neon 失効認証情報（2026-08-29 失効）を参照し続け /health が 200 でも DB 依存リクエストが 500 の状態で稼働していた（2026-09-18 実測）、旧 civilpdf-backup.service は 21日間 Neon への pg_dump に失敗し続けていた。退役手順は deploy/civilpdf-backend.service 等の RETIRED 注記を参照。
+2. リポジトリを main の検証済み commit へ更新（本番チェックアウトは `~/Projects/Mirai-Construction-DX/CivilPDF-DX`。2026-09 の GitHub 組織移管に伴い旧 `~/Projects/Mirai-DX-Project/CivilPDF-DX` から移動・旧パスは消滅。compose プロジェクト名はディレクトリ名 `CivilPDF-DX` 由来の `civilpdf-dx` のままなので、新パスから同じ本番スタックを操作できる。本番 env はこの checkout の `.env`（Git 管理外））。以降の手順（イメージ再ビルド docker compose -f docker-compose.prod.yml up -d --build、スモーク ./scripts/healthcheck-civilpdf.sh、ログ確認 docker compose logs --tail 100 backend）は compose 本番構成で実施する。旧構成（ホスト直 uvicorn 8180 / vite preview 5182）は 2026-09-18 に退役: 旧 civilpdf-backend.service は Neon 失効認証情報（2026-08-29 失効）を参照し続け /health が 200 でも DB 依存リクエストが 500 の状態で稼働していた（2026-09-18 実測）、旧 civilpdf-backup.service は 21日間 Neon への pg_dump に失敗し続けていた。退役手順は deploy/civilpdf-backend.service 等の RETIRED 注記を参照。
 
 ## 3. バックアップと復旧
 
@@ -196,13 +196,12 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
   alembic head・認証フローまで検証済み。ホスト直 `civildx_prod` は移設先の構築例として
   保持（[local-postgresql.md](../deployment/local-postgresql.md)）。障害の記録は
   [インシデント記録](incident-2026-08-29-database-credential.md) を参照
-- **checkout が 2 系統に分裂している（要設計判断）**: systemd units は
-  `~/Projects/Mirai-DX-Project/CivilPDF-DX`（本番稼働中）を参照している一方、
+- **checkout が 2 系統に分裂している（要設計判断）**: systemd units と本番 compose は
+  `~/Projects/Mirai-Construction-DX/CivilPDF-DX`（本番稼働中・2026-09-26 確認）を参照している一方、
   別の作業コピー `~/Projects/Mirai-Admin-Platform/CivilPDF-DX` も存在する。
   どちらも独立した git checkout であり、**変更を一方に入れても他方には反映されない**。
-  デプロイ手順（§2）の対象ディレクトリを明確にし、恒久的には専用リリースディレクトリへ
-  分離することを推奨する
-- **共有 checkout の制約**: 本番サービス（systemd units）と監視/訓練スクリプトはリポジトリの作業ツリー（`~/Projects/Mirai-DX-Project/CivilPDF-DX`）から起動する。別セッションが feature branch へ checkout を切り替えると、その間スクリプト/コードが一時的に不在になり、monitor timer 等が `203/EXEC` で失敗しうる（2026-08-06 に実測）。運用中は main を checkout した状態を維持し、複数セッションで並行作業する場合は `git worktree` を利用すること。恒久対策は専用リリースディレクトリへの分離（要設計判断）
+  恒久的には専用リリースディレクトリへ分離することを推奨する
+- **共有 checkout の制約**: 本番サービス（systemd units・MVP backend/frontend）と監視/訓練スクリプト、本番 compose のビルドコンテキストはリポジトリの作業ツリー（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）から起動する。別セッションが feature branch へ checkout を切り替えると、その間スクリプト/コードが一時的に不在になり、monitor timer 等が `203/EXEC` で失敗しうる（2026-08-06 に実測）。運用中は main を checkout した状態を維持し、複数セッションで並行作業する場合は `git worktree` を利用すること。恒久対策は専用リリースディレクトリへの分離（要設計判断）
 - Issue #62: PDF Editor デスクトップ本体は別リポジトリ（CivilPDF-Editor）で開発継続
 - Issue #94: 配布同期の完了報告（管理タスク）
 - Issue #106: ecdsa advisory（upstream 修正待ち・CI 明示 ignore）

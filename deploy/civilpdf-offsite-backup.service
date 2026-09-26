@@ -4,9 +4,9 @@ Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX
 EnvironmentFile=%h/.config/civilpdf/civilpdf.env
-ExecStart=%h/Projects/Mirai-DX-Project/CivilPDF-DX/scripts/backup-offsite.sh
+ExecStart=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/scripts/backup-offsite.sh
 
 NoNewPrivileges=true
 

@@ -4,11 +4,11 @@ Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX/src/console/backend
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/src/console/backend
 
-Environment=PYTHONPATH=%h/Projects/Mirai-DX-Project/CivilPDF-DX/src/console/backend
-Environment=DATABASE_URL=sqlite:///%h/Projects/Mirai-DX-Project/CivilPDF-DX/.mvp-data/civilpdf-mvp.db
-Environment=UPLOAD_DIR=%h/Projects/Mirai-DX-Project/CivilPDF-DX/.mvp-data/uploads
+Environment=PYTHONPATH=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/src/console/backend
+Environment=DATABASE_URL=sqlite:///%h/Projects/Mirai-Construction-DX/CivilPDF-DX/.mvp-data/civilpdf-mvp.db
+Environment=UPLOAD_DIR=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/.mvp-data/uploads
 # MVP 専用のダミー秘密値（本番の civilpdf.env とは完全分離）
 Environment=SECRET_KEY=mvp-demo-secret-key-32bytes-minimum
 Environment=TIMESTAMP_HMAC_KEY=mvp-demo-hmac-key-32bytes-minimum
@@ -19,7 +19,7 @@ Environment=APP_VERSION=0.9.0
 # 本番 (civilpdf-backend.service) には設定しないこと。
 Environment=AUTH_BYPASS=true
 
-ExecStart=%h/Projects/Mirai-DX-Project/CivilPDF-DX/.venv-mvp/bin/uvicorn main:app --host 127.0.0.1 --port 8181
+ExecStart=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/.venv-mvp/bin/uvicorn main:app --host 127.0.0.1 --port 8181
 
 Restart=on-failure
 RestartSec=5s
