@@ -65,10 +65,7 @@ export async function flattenCheck(
 
 // ─── Editor events (audit) ───────────────────────────────────────────────────
 export type EditorEventType =
-  | "stamp.placed"
-  | "stamp.removed"
-  | "annotation.added"
-  | "comment.added";
+  "stamp.placed" | "stamp.removed" | "annotation.added" | "comment.added";
 
 export interface EditorEventItem {
   event_type: EditorEventType;

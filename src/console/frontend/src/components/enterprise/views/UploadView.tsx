@@ -509,8 +509,11 @@ export function UploadView({ onNavigate, onShowToast }: ViewProps) {
           <div className="ep-panel-body">
             {/* These toggles are local state only: uploadDocument() does not
                 receive them, so nothing here changes what the server does. */}
-            <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 8px" }}>
-              ⚠️ これらの処理オプションは現在未実装です（サーバーへは送信されません）。
+            <p
+              style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 8px" }}
+            >
+              ⚠️
+              これらの処理オプションは現在未実装です（サーバーへは送信されません）。
             </p>
             {options.map((opt) => (
               <div key={opt.id} className="ep-opt-row">

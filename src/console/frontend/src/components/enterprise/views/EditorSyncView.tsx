@@ -125,9 +125,7 @@ export const EditorSyncView: FC<ViewProps> = ({ onShowToast }) => {
                     ? `${dxStats.success_rate_30d}%`
                     : "—"}
                 </div>
-                <div className="delta">
-                  30日 {dxStats.recent_30d.total} 件
-                </div>
+                <div className="delta">30日 {dxStats.recent_30d.total} 件</div>
               </div>
               <div className="ep-stat">
                 <div className="lbl">累計成功率</div>
@@ -145,7 +143,10 @@ export const EditorSyncView: FC<ViewProps> = ({ onShowToast }) => {
               </div>
               <div className="ep-stat">
                 <div className="lbl">失敗（30日）</div>
-                <div className="val" style={{ color: "var(--danger, #b91c1c)" }}>
+                <div
+                  className="val"
+                  style={{ color: "var(--danger, #b91c1c)" }}
+                >
                   {dxStats.recent_30d.error}
                 </div>
                 <div className="delta">
@@ -156,7 +157,11 @@ export const EditorSyncView: FC<ViewProps> = ({ onShowToast }) => {
               </div>
             </div>
             <table
-              style={{ width: "100%", borderCollapse: "collapse", marginTop: "10px" }}
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                marginTop: "10px",
+              }}
             >
               <thead>
                 <tr>
@@ -189,7 +194,9 @@ export const EditorSyncView: FC<ViewProps> = ({ onShowToast }) => {
             DX 同期統計は Admin 権限でのみ表示できます（403）。
           </p>
         ) : (
-          <p style={{ color: "var(--muted)", padding: "12px 0" }}>読み込み中...</p>
+          <p style={{ color: "var(--muted)", padding: "12px 0" }}>
+            読み込み中...
+          </p>
         )}
       </div>
 
