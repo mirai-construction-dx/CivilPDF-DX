@@ -17,6 +17,8 @@
 #   4. production health (scripts/healthcheck-civilpdf.sh, incl. backup freshness)
 #   5. rollback image tags exist (civilpdf-dx-{backend,frontend}:pre-*)
 #   6. when APPS_RELEASE_BASE_URL is set in .env: installer links and SHA-256
+#   7. APP_VERSION in .env matches the repository VERSION (shown in the UI
+#      badge and recorded in electronic-delivery INDEX.XML)
 #
 # Only APPS_* keys are read from .env; secret values are never printed.
 #
@@ -126,6 +128,17 @@ else
   else
     fail "check-editor-assets.py itself failed (rc=$rc: python/httpx/arguments?); links not verified"
   fi
+fi
+
+# 7. APP_VERSION (a public value, not a secret)
+repo_version="$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION" 2>/dev/null)"
+app_version="$(apps_env APP_VERSION)"
+if [[ -z "$repo_version" ]]; then
+  warn "VERSION file not found; APP_VERSION unchecked"
+elif [[ "$app_version" != "$repo_version" ]]; then
+  fail "APP_VERSION in .env is '${app_version:-unset}' but VERSION is $repo_version (update .env before rebuilding)"
+else
+  pass "APP_VERSION matches VERSION ($repo_version)"
 fi
 
 echo "---"

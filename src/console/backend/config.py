@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "CivilPDF-DX"
-    app_version: str = "0.1.0"
+    app_version: str = "0.10.0"
     debug: bool = False
 
     # MVP 公開デモ用のログイン認証バイパス。true のとき、トークン無しの

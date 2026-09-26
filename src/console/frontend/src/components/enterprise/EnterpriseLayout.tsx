@@ -1,5 +1,6 @@
 import { type FC, useState, useEffect, useRef, useCallback } from "react";
 import "../../styles/enterprise.css";
+import { fetchServerVersion } from "../../api/version";
 import { LandingView } from "./views/LandingView";
 import { DashboardView } from "./views/DashboardView";
 import { UploadView } from "./views/UploadView";
@@ -599,6 +600,18 @@ export const EnterpriseLayout: FC = () => {
     }
   }
 
+  // Show the version the server actually runs (was a stale hard-coded v0.4.2).
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchServerVersion().then((v) => {
+      if (alive) setServerVersion(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="ep-root" data-density={density}>
       {/* ── Topbar ── */}
@@ -612,7 +625,9 @@ export const EnterpriseLayout: FC = () => {
           >
             <span className="ep-brand-icon">⬡</span>
             <span className="ep-brand-name">CivilPDF·DX</span>
-            <span className="ep-brand-badge">v0.4.2 · Enterprise</span>
+            <span className="ep-brand-badge">
+              {serverVersion ? `v${serverVersion} · Enterprise` : "Enterprise"}
+            </span>
           </div>
           <nav className="ep-nav-groups">
             {NAV_GROUPS.map((group) => (

@@ -46,6 +46,7 @@ def repo(tmp_path):
     _git(work, "config", "user.email", "t@example.test")
     _git(work, "config", "user.name", "t")
     (work / "state.json").write_text("{}\n")
+    (work / "VERSION").write_text("1.0.0\n")
     (work / "app.txt").write_text("v1\n")
     (work / "scripts").mkdir()
     _git(work, "add", ".")
@@ -53,7 +54,9 @@ def repo(tmp_path):
     _git(work, "remote", "add", "origin", str(origin))
     _git(work, "push", "-q", "origin", "main")
     env_file = work / ".env"
-    env_file.write_text(f"SECRET_KEY={_SECRET}\nAPPS_RELEASE_BASE_URL=\n")
+    env_file.write_text(
+        f"SECRET_KEY={_SECRET}\nAPP_VERSION=1.0.0\nAPPS_RELEASE_BASE_URL=\n"
+    )
     env_file.chmod(0o600)
 
     bindir = tmp_path / "bin"
@@ -211,3 +214,11 @@ def test_checker_crash_is_distinguished_from_link_failure(repo):
     res = _run(repo)
     assert res.returncode == 1
     assert "check-editor-assets.py itself failed (rc=2" in res.stdout
+
+
+def test_app_version_mismatch_fails(repo):
+    (repo["work"] / ".env").write_text("APP_VERSION=0.9.0\n")
+    (repo["work"] / ".env").chmod(0o600)
+    res = _run(repo)
+    assert res.returncode == 1
+    assert "APP_VERSION in .env is '0.9.0' but VERSION is 1.0.0" in res.stdout

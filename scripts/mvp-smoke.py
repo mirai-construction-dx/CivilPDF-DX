@@ -48,7 +48,19 @@ def main() -> int:
             )
         else:
             probe = client.get("/api/v1/auth/me")
-            check("api reachable", probe.status_code == 401)
+            # 401 normally; 200 when the MVP runs with AUTH_BYPASS=true (#134).
+            # Either way a JSON answer proves the API is reachable via the proxy.
+            is_json = probe.headers.get("content-type", "").startswith(
+                "application/json"
+            )
+            # With AUTH_BYPASS the anonymous user must stay a VIEWER (#134).
+            bypass_ok = (
+                probe.status_code == 200
+                and is_json
+                and (probe.json().get("role") == "viewer")
+            )
+            ok = (probe.status_code == 401 and is_json) or bypass_ok
+            check("api reachable", ok, f"status={probe.status_code}")
 
         login = client.post(
             "/api/v1/auth/token",

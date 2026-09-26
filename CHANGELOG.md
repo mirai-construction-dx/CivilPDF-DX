@@ -8,6 +8,39 @@
 
 ## [Unreleased]
 
+### 計画中
+
+- アプリ配信: 展開対象/KPI の実 MDM（Intune / Jamf）連携
+- PDF Editor デスクトップ本体 + ビルドパイプライン新規構築（Issue #62 / Scope B）
+
+---
+
+## [0.10.0] — 2026-09-26
+
+### ⚠️ BREAKING
+
+- 📦 `/api/v1/apps/download/{mac-dmg|linux-deb|linux-appimage|linux-rpm}` は **404** になった（PDF Editor の配布は Windows のみ。macOS は後日対応・#147）。旧 ID を直書きしたクライアントは影響を受ける
+- 🖥️ 配信ページの「配布設定」トグル（自動アップデート／最低バージョン強制／テレメトリー）を撤去（効果のない UI のため・読み取り専用の「配布ポリシー」表示へ）
+- 🤖 AI 機能は、管理者が設定で **有効化したときだけ** 動く（既定は無効・fail closed）。env の API キーだけでは動かない
+- 🗄️ 本番 DB を Neon からローカル PostgreSQL 16（compose の db コンテナ）へ移行済み（#136）。Neon 前提の設定は廃止
+- 🤖 AI が無効なとき `/api/v1/ai/documents/{id}/classify|extract|summary` は **503** を返す（#151）
+- 🔍 OCR API: テキストレイヤのない PDF は、結果らしい文字列ではなく `status="unsupported"`・空の `pages` を返す。`status="failed"` と `engine` フィールドを追加（09-18 (5)）
+- 📤 CSV エクスポートに上限 `MAX_EXPORT_ROWS=100,000` を設け、超えると **413**（09-18 (2)）
+- 🔧 `scripts/migrate-sqlite-to-neon.py` → `scripts/migrate-sqlite-to-postgresql.py` に改名
+
+### ⬆️ アップグレード時の注意（0.9.0 → 0.10.0）
+
+- migration `m3n4o5p6q7r8` は `audit_logs.sequence_number` の重複があると `RuntimeError` で止まる。事前に重複がないことを確認する
+- `.env` の `APP_VERSION` を `0.10.0` にしてから `--build` 付きで再ビルドする（`scripts/pre-deploy-check.sh` が不一致を FAIL にする）。更新を忘れると UI バッジと電子納品 INDEX.XML の版が古いままになる
+
+### 2026-09-26 (17) — CI とコード品質の強化・AI 停止スイッチの修正・リリース準備
+
+- 🧹 `tests/` と `scripts/` を ruff format で整形し、CI に `ruff format --check` を追加（#150）
+- 🎨 frontend に prettier 3.9.9 を導入して一括整形し、CI に `format:check` を追加（#154）
+- 🐛 管理者の AI 停止スイッチ（`ai_settings.enabled`）を全 AI 呼び出しで強制（fail closed・#151）
+- 🔒 CI を最小権限化（`permissions: contents: read`）、gitleaks を SHA-256 で検証、AGENTS.md と PR テンプレート、社内設計文書コピーの gitignore（#152）
+- 🏷️ 版を 0.10.0 に上げた（#155）。UI のバッジは `/health` の版を表示する（固定値 `v0.4.2` を廃止）。`verify-version-sync.sh` で固定値の再発と backend の env 例も検査。MVP スモークの到達確認を AUTH_BYPASS に対応（公開 URL で 16/16 PASS）
+
 ### 2026-09-26 (16) — 文書の実態同期・/apps の E2E・スモーク拡張・開発環境の手順・リリース計画
 
 - 📄 system-architecture の GUI を「PDF Editor Client（Tauri v2・Windows・別リポジトリ）」に修正（旧: Electron / C++）、PostgreSQL 15 → 16。requirements §3.1・gui-screens に実装状況を注記
@@ -531,6 +564,10 @@
   往復・frontend vitest（271件）で回帰なしを確認。backend全体テストはローカル環境の実行速度
   制約でフル完走未確認（別途CI経由での確認を推奨、既知の制約として記録）
 
+## [0.9.0] — 2026-08-13
+
+> ℹ️ 0.8.0（#121・2026-08-12 に `VERSION` を設定）は 1 日だけでタグも作られなかったため、本節に統合した。`v0.9.0` のタグは 2026-08-13 の #132（`a73b90b`）に後付けで付与する。
+
 ### 2026-08-13 — MVP / Prototype 公開（v0.9.0）
 
 - **P0 修正**: `LICENSE` に残っていた未解決の Git 競合マーカーを除去（Copyright を Kensan196948G に一本化。GitHub のライセンス検出が復帰）
@@ -650,13 +687,6 @@
 - **Windows `.msi` インストーラー**を追加（`.exe` と選択式・GPO/SCCM サイレント展開向け）
 - 配信ページ UI: リリースノート/ビルド情報ボタンを実 API 化、`dev:mock` で配信ページが動作、展開対象/KPI は「デモ」明示
 - 運用手順: `docs/deployment/app-distribution.md` を追加
-
-### 計画中
-
-- アプリ配信: 展開対象/KPI の実 MDM（Intune / Jamf）連携
-- PDF Editor デスクトップ本体 + ビルドパイプライン新規構築（Issue #62 / Scope B）
-
----
 
 ## [0.7.0] — 2026-06-01
 
