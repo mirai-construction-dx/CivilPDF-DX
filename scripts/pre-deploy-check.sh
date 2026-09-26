@@ -23,7 +23,8 @@
 # Only APPS_* keys are read from .env; secret values are never printed.
 #
 # Overridable for tests: CIVILPDF_PROJECT_DIR, CIVILPDF_HEALTHCHECK,
-# CIVILPDF_PYTHON, CIVILPDF_IMAGE_PREFIX, CIVILPDF_REMOTE_TIMEOUT.
+# CIVILPDF_PYTHON, CIVILPDF_IMAGE_PREFIX, CIVILPDF_REMOTE_TIMEOUT,
+# CIVILPDF_HEALTHCHECK_TIMEOUT.
 #
 set -uo pipefail
 export GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0
@@ -33,6 +34,7 @@ HEALTHCHECK="${CIVILPDF_HEALTHCHECK:-$PROJECT_DIR/scripts/healthcheck-civilpdf.s
 PYTHON="${CIVILPDF_PYTHON:-python3}"
 IMAGE_PREFIX="${CIVILPDF_IMAGE_PREFIX:-civilpdf-dx}"
 REMOTE_TIMEOUT="${CIVILPDF_REMOTE_TIMEOUT:-20}"
+HEALTH_TIMEOUT="${CIVILPDF_HEALTHCHECK_TIMEOUT:-120}"
 ENV_FILE="$PROJECT_DIR/.env"
 
 fails=0
@@ -46,7 +48,7 @@ cd "$PROJECT_DIR" || { echo "[FAIL] cannot cd to $PROJECT_DIR"; exit 1; }
 # 1. branch and commit
 branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
 head="$(git rev-parse HEAD 2>/dev/null)"
-remote_main="$(timeout "$REMOTE_TIMEOUT" git ls-remote origin refs/heads/main 2>/dev/null | cut -f1)"
+remote_main="$(timeout --foreground "$REMOTE_TIMEOUT" git ls-remote origin refs/heads/main 2>/dev/null | cut -f1)"
 if [[ "$branch" != "main" ]]; then
   fail "checkout is on '$branch', not main (compose builds from this working tree)"
 elif [[ -z "$remote_main" ]]; then
@@ -80,10 +82,13 @@ else
 fi
 
 # 4. health (includes backup freshness)
-if timeout 120 "$HEALTHCHECK" --quiet >/dev/null 2>&1; then
+# --foreground: without it, timeout runs the check in a background process
+# group, and from an interactive terminal anything touching the TTY (e.g.
+# `docker compose exec`) is stopped by SIGTTIN/SIGTTOU until the timeout fires.
+if timeout --foreground "$HEALTH_TIMEOUT" "$HEALTHCHECK" --quiet >/dev/null 2>&1; then
   pass "healthcheck OK (services, DB readiness, backup freshness)"
 else
-  fail "healthcheck failed or timed out (120s); run $HEALTHCHECK for details"
+  fail "healthcheck failed or timed out (${HEALTH_TIMEOUT}s); run $HEALTHCHECK for details"
 fi
 
 # 5. rollback tags

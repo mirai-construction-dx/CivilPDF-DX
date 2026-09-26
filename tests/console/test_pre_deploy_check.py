@@ -1,6 +1,7 @@
 """Tests for scripts/pre-deploy-check.sh (temporary git repo + stubbed tools)."""
 
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -222,3 +223,24 @@ def test_app_version_mismatch_fails(repo):
     res = _run(repo)
     assert res.returncode == 1
     assert "APP_VERSION in .env is '0.9.0' but VERSION is 1.0.0" in res.stdout
+
+
+@pytest.mark.skipif(shutil.which("script") is None, reason="needs util-linux script")
+def test_healthcheck_touching_the_tty_does_not_hang_from_a_terminal(repo):
+    """Regression: from an interactive terminal, `timeout` (without --foreground)
+    ran the healthcheck in a background process group, so `docker compose exec`
+    touching the TTY was stopped until the 120 s timeout and the check FAILed."""
+    # Stub healthcheck that reads the controlling terminal, like compose exec.
+    _write_exec(
+        Path(repo["env"]["CIVILPDF_HEALTHCHECK"]),
+        "read -r -t 1 _ < /dev/tty; exit 0\n",
+    )
+    env = {**repo["env"], "CIVILPDF_HEALTHCHECK_TIMEOUT": "10"}
+    res = subprocess.run(
+        ["script", "-qec", f"bash {_SCRIPT}", "/dev/null"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert "[PASS] healthcheck OK" in res.stdout, res.stdout
