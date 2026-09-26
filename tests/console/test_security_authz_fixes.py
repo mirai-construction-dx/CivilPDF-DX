@@ -5,7 +5,6 @@ import io
 
 import pytest
 
-from models.user import Project
 
 
 def _make_pdf_bytes() -> bytes:

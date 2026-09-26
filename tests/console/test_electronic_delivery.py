@@ -24,7 +24,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from models.document import Document, DocumentStatus, DocumentType
-from models.user import Project, User, UserRole, UserStatus
+from models.user import Project, User
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -1,7 +1,5 @@
 """Approval workflow API tests."""
 import io
-from auth.jwt import get_password_hash
-from models.user import User, UserRole, UserStatus
 
 
 def _pdf() -> bytes:
