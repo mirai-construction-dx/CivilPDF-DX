@@ -56,7 +56,7 @@
       "tunnel": "civilpdf-mvp",
       "demo_credentials": "admin@demo.civilpdf.example / CivilPDF-Demo-2026!（架空データ）",
       "seed_script": "scripts/seed_demo_data.py",
-      "smoke": "scripts/mvp-smoke.py — 15 項目 0 failure（2026-08-13 実測）",
+      "smoke": "scripts/mvp-smoke.py — 15 項目 0 failure（2026-08-13 実測）。2026-09-26 に「アプリ配布は Windows のみ」を加えて 16 項目（MVP 再起動後に PASS の予定）",
       "pr": 132,
       "test_counts": "CI 実測 691 件（backend 394 + integration 20 + frontend vitest 271 + Playwright 6）・12/12 success",
       "p0_remaining": 0,
@@ -388,7 +388,10 @@
     "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）",
     "[人間作業] 本番 env に APPS_RELEASE_BASE_URL（editor-v1.12.6）と APPS_SHA256_WIN_EXE/MSI を設定し compose 再ビルド（Release は 2026-09-26 公開・検証済み）",
     "[P3] ローカル Python 環境のドリフト（fastapi 0.139.2 / httpx 0.27.2 ≠ requirements の 0.136.3 / 0.28.1）→ requirements-dev で venv を作り直すと Starlette の httpx 非推奨警告が消える見込み",
-    "[保留/macOS] PDF Editor の macOS 配布は後日対応 — Issue #147 で追跡（再開条件: Developer ID 署名・notarization・配布形式。再開時は apps.py の _PENDING_PLATFORMS から _build_packages へ戻す）"
+    "[保留/macOS] PDF Editor の macOS 配布は後日対応 — Issue #147 で追跡（再開条件: Developer ID 署名・notarization・配布形式。再開時は apps.py の _PENDING_PLATFORMS から _build_packages へ戻す）",
+    "[要承認] MVP 環境の再起動（civilpdf-mvp-backend/frontend）で #141 以降を反映 → mvp-smoke の apps distribution を PASS に",
+    "[要判断] リリース方針（reports/release/20260926-release-plan.md・推奨 案A: v0.9.0 後付けタグ + v0.10.0）",
+    "[P3] 整形のみの PR: frontend prettier（58 ファイル）・tests/scripts の ruff format と CI の format --check 追加"
   ],
   "learning": {
     "failure_patterns": [

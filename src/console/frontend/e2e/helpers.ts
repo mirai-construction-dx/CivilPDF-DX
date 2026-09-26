@@ -82,6 +82,55 @@ export const STATS = {
   by_status: { approved: 2 },
 }
 
+// Mirrors GET /api/v1/apps/releases: Windows-only packages + macOS pending.
+export const APPS_RELEASES = {
+  stable_version: 'v1.12.6',
+  packages: [
+    {
+      id: 'win-exe',
+      platform: 'windows',
+      format: 'exe',
+      label: 'インストーラー (.exe / NSIS)',
+      filename: 'CivilPDF.Editor_1.12.6_x64-setup.exe',
+      version: '1.12.6',
+      size_label: '約 39.3 MB',
+      sha256: null,
+      download_path: '/api/v1/apps/download/win-exe',
+      available: true,
+    },
+    {
+      id: 'win-msi',
+      platform: 'windows',
+      format: 'msi',
+      label: 'インストーラー (.msi)',
+      filename: 'CivilPDF.Editor_1.12.6_x64_ja-JP.msi',
+      version: '1.12.6',
+      size_label: '約 40.1 MB',
+      sha256: null,
+      download_path: '/api/v1/apps/download/win-msi',
+      available: true,
+    },
+  ],
+  channels: [
+    {
+      id: 'stable',
+      label: 'Stable',
+      version: 'v1.12.6',
+      release_date: '2026-08-12',
+      description: '安定版（E2E）',
+      user_count: 0,
+    },
+  ],
+  pending_platforms: [
+    {
+      platform: 'macos',
+      label: 'macOS',
+      status: 'pending',
+      note: '後日対応（ペンディング）。現在は Windows 版のみ提供しています',
+    },
+  ],
+}
+
 interface SetupOptions {
   documents?: unknown[]
   projects?: unknown[]
@@ -148,6 +197,8 @@ export async function setupApp(page: Page, opts: SetupOptions = {}): Promise<voi
     if (pathname.endsWith('/timestamp/verify')) return json(TIMESTAMP_VERIFY)
     if (pathname.endsWith('/timestamp') && method === 'POST') return json(TIMESTAMP_APPLY)
     if (pathname === '/api/v1/stats/') return json(STATS)
+    if (pathname === '/api/v1/apps/releases') return json(APPS_RELEASES)
+    if (pathname === '/api/v1/apps/release-notes') return json({ notes: [] })
     if (pathname.endsWith('/electronic-delivery/check')) return json(DELIVERY_READINESS)
     if (pathname.endsWith('/electronic-delivery') && method === 'POST') {
       return route.fulfill({ contentType: 'application/zip', body: 'PK-e2e-zip-bytes' })
