@@ -41,13 +41,16 @@ def test_documented_filenames_match_api():
 def test_doc_references_current_version_only():
     text = _doc_text()
     assert f"v{_VERSION}" in text
-    # Fictional Electron-era version must not reappear.
-    assert "2.4.1" not in text
+    # Every x.y.z in the doc must be the current release, so a version bump
+    # that forgets the doc (or the Electron-era 2.4.1) fails here.
+    assert set(re.findall(r"\b\d+\.\d+\.\d+\b", text)) == {_VERSION}
 
 
 def test_doc_declares_pending_platforms_from_api():
     text = _doc_text()
-    lines = text.splitlines()
+    table_rows = [ln for ln in text.splitlines() if ln.startswith("|")]
     for p in _PENDING_PLATFORMS:
-        # The OS table must mark each pending platform on a single row.
-        assert any(p.label in ln and "後日対応" in ln for ln in lines), p.label
+        # The OS table must mark each pending platform on a single table row.
+        assert any(p.label in r and "後日対応" in r for r in table_rows), p.label
+    # Distributed platforms must not be marked pending in the table.
+    assert not any("Windows" in r and "後日対応" in r for r in table_rows)

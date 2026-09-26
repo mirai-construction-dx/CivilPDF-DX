@@ -316,8 +316,10 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                       tabIndex={0}
                       style={{ opacity: isLoading ? 0.6 : 1 }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ")
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           handleDownload(pkg);
+                        }
                       }}
                     >
                       <div className="os">
@@ -347,14 +349,17 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                     })
                   }
                   role="button"
+                  aria-label={`${p.label} 版は後日対応（詳細を表示）`}
                   tabIndex={0}
                   style={{ opacity: 0.55 }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       onShowModal({
                         title: `${p.label} — 後日対応`,
                         body: buildPendingModalBody(p),
                       });
+                    }
                   }}
                 >
                   <div className="os">{p.label}</div>

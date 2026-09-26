@@ -22,7 +22,7 @@
 
 - 📄 `docs/deployment/app-distribution.md`・README・`.env.prod.example` に残っていた Electron 計画時の記載
   （`win-zip` / `mac-pkg` / `ent-intune`・架空の v2.4.1・Beta/Insider チャンネル）を削除し、
-  API の実パッケージ 6 種（Windows exe/msi・macOS dmg・Linux deb/AppImage/rpm）と Stable のみの運用へ是正
+  実 API（Windows exe/msi の 2 種・macOS は後日対応・Linux は対象外）と Stable のみの運用へ是正（(12) の Windows 限定と同時適用）
 - 🧩 PDF Editor 本体の正本は別リポジトリ CivilPDF-Editor であることを明記（本リポジトリに desktop/ を作らない）
 - 🧪 `tests/console/test_apps_docs_contract.py` 追加 — 文書の package_id・ファイル名・バージョンを `api/apps.py` と照合し、再ドリフトを CI で検知
 - API・DB・認証・本番設定の変更なし
