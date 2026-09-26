@@ -123,6 +123,8 @@ CivilPDF-DX は上記課題を以下のアプローチで解決する。
 
 ### 3.1 GUIアプリ（Windows デスクトップ exe）
 
+> 📌 実装状況（2026-09-26）: GUI アプリは別製品 **PDF Editor Client**（CivilPDF-Editor リポジトリ・Tauri v2）として実装され、v1.12.6 を配布中。配布は **Windows のみ**（macOS は後日対応: Issue #147）。本節の要件は当初の仕様として残しており、個々の要件がどこまで実装されているかは CivilPDF-Editor 側で管理する。コンソールからの配布は [app-distribution.md](deployment/app-distribution.md) を参照
+
 #### 3.1.1 PDF Viewer
 
 | 機能ID | 機能名 | 要件 | 優先度 |
