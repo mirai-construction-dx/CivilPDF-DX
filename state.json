@@ -427,8 +427,8 @@
           "last_used": "2026-06-21T00:19:51.538Z",
           "last_description": "PDF Editor Client 完成度監査"
         },
-        "_total_agent_calls": 15,
-        "_last_agent_call_at": "2026-09-26T05:27:37.646Z",
+        "_total_agent_calls": 14,
+        "_last_agent_call_at": "2026-09-18T02:49:22.219Z",
         "architect": {
           "call_count": 2,
           "last_used": "2026-09-18T02:48:57.589Z",
@@ -463,11 +463,6 @@
           "call_count": 1,
           "last_used": "2026-09-18T02:49:22.219Z",
           "last_description": "UI/UX・業務適合性・競合比較調査"
-        },
-        "code-reviewer": {
-          "call_count": 1,
-          "last_used": "2026-09-26T05:27:37.646Z",
-          "last_description": "Review PR 144 diff"
         }
       },
       "skills": {
