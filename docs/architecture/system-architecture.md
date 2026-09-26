@@ -9,7 +9,7 @@
 ```mermaid
 flowchart TB
     subgraph clients["クライアント層"]
-        GUI["GUIアプリ\n(Windows .exe)\nElectron / C++"]
+        GUI["PDF Editor Client\n(Windows .exe / .msi)\nTauri v2・別リポジトリ"]
         WEB["管理コンソール\n(WebUI)\nReact 19 + Vite"]
     end
 
@@ -19,7 +19,7 @@ flowchart TB
     end
 
     subgraph data["データ層"]
-        PG[("PostgreSQL 15\nメインDB")]
+        PG[("PostgreSQL 16\nメインDB")]
         REDIS[("Redis\nセッション・キャッシュ\n(将来実装)")]
         FS["ファイルストレージ\nローカル / S3互換\n/uploads/*"]
     end
@@ -287,7 +287,7 @@ flowchart TD
 # docker-compose.yml 構成イメージ
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     volumes: [postgres_data:/var/lib/postgresql/data]
     environment: [POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD]
 
