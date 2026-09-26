@@ -69,3 +69,6 @@ assets/fonts/**/*.woff2
 .claude/settings.json.bak-*
 reports/agent-transcripts/
 test_write_probe.db
+
+# Portfolio design docs (canonical copy lives outside this public repo; internal material)
+docs/みらい建設土木DX・AI統合基盤プロジェクト/
