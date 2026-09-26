@@ -12,6 +12,7 @@ Usage:
     APPS_RELEASE_BASE_URL=https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/editor-v1.12.6 \\
         python scripts/check-editor-assets.py
     python scripts/check-editor-assets.py --base-url <url> [--verify-sha256]
+    python scripts/check-editor-assets.py --base-url <url> --filenames a.exe,b.msi
 
 Exit code: 0 = all reachable, 1 = at least one failure, 3 = base URL unset
 (2 is left to argparse usage errors).
@@ -58,9 +59,33 @@ def check_package(
     return None
 
 
-def run(base_url: str, client: httpx.Client, verify_sha256: bool = False) -> int:
+def packages_from_filenames(filenames: list[str]) -> list[ReleasePackage]:
+    """Packages for explicit filenames (e.g. read from the running production image)."""
+    return [
+        ReleasePackage(
+            id=name,
+            platform="",
+            format="",
+            label=name,
+            filename=name,
+            version="",
+            size_label="",
+            sha256=None,
+            download_path="",
+            available=True,
+        )
+        for name in filenames
+    ]
+
+
+def run(
+    base_url: str,
+    client: httpx.Client,
+    verify_sha256: bool = False,
+    packages: list[ReleasePackage] | None = None,
+) -> int:
     failures = 0
-    for pkg in _build_packages():
+    for pkg in packages if packages is not None else _build_packages():
         reason = check_package(client, base_url, pkg, verify_sha256)
         if reason is None:
             # Make it visible when only reachability (not integrity) was checked.
@@ -86,6 +111,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="download assets and compare with APPS_SHA256_<PKG_ID> when set",
     )
+    parser.add_argument(
+        "--filenames",
+        default="",
+        help="comma-separated asset names to check instead of this checkout's list",
+    )
     args = parser.parse_args(argv)
     base_url = args.base_url.rstrip("/")
     if not base_url:
@@ -94,8 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     if not base_url.startswith("https://"):
         print(f"[FAIL] base URL must be https: {base_url}")
         return 1
+    names = [n.strip() for n in args.filenames.split(",") if n.strip()]
+    packages = packages_from_filenames(names) if names else None
     with httpx.Client(follow_redirects=True, timeout=30) as client:
-        return run(base_url, client, args.verify_sha256)
+        return run(base_url, client, args.verify_sha256, packages)
 
 
 if __name__ == "__main__":

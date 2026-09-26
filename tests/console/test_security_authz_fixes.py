@@ -6,7 +6,6 @@ import io
 import pytest
 
 
-
 def _make_pdf_bytes() -> bytes:
     return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n%%EOF"
 

@@ -118,7 +118,7 @@ def test_redirect_to_asset_cdn_is_followed(script):
 def test_main_strips_trailing_slash_and_checks(script, monkeypatch):
     calls = []
 
-    def fake_run(base_url, client, verify_sha256=False):
+    def fake_run(base_url, client, verify_sha256=False, packages=None):
         calls.append(base_url)
         return 0
 
@@ -134,3 +134,15 @@ def test_non_https_base_url_rejected(script):
 def test_unset_base_url_skips(script, monkeypatch):
     monkeypatch.delenv("APPS_RELEASE_BASE_URL", raising=False)
     assert script.main([]) == 3
+
+
+def test_explicit_filenames_override_checkout_list(script):
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path.rsplit("/", 1)[-1])
+        return httpx.Response(200)
+
+    pkgs = script.packages_from_filenames(["old_1.0.0.exe", "old_1.0.0.msi"])
+    assert script.run(_BASE, _client(handler), packages=pkgs) == 0
+    assert seen == ["old_1.0.0.exe", "old_1.0.0.msi"]

@@ -33,8 +33,9 @@ if [[ "${1:-}" == "--test" ]]; then
   exit $rc
 fi
 
-# Daily PDF Editor download-link watch (self-throttled, never fails the monitor).
-"$PROJECT_DIR/scripts/editor-asset-watch.sh" || true
+# Daily PDF Editor download-link watch, run after the healthcheck on every exit
+# path (self-throttled; the trap does not change the monitor's exit status).
+trap '"$PROJECT_DIR/scripts/editor-asset-watch.sh" || true' EXIT
 
 now="$(date +%s)"
 if "$PROJECT_DIR/scripts/healthcheck-civilpdf.sh" --quiet; then
