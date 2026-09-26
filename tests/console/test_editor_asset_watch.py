@@ -3,11 +3,17 @@
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "editor-asset-watch.sh"
+
+# The watch script runs only on the Linux production host (systemd monitor timer).
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="Linux-host ops script (bash + POSIX paths)"
+)
 
 
 def _write_exec(path: Path, body: str) -> Path:
