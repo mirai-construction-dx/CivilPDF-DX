@@ -13,7 +13,7 @@
 - 🔍 `scripts/editor-asset-watch.sh` 追加・`monitor-civilpdf.sh` から日次実行 — PDF Editor 配布リンクが届かなければメール通知（復旧時も 1 回）。ヘルス監視の結果には影響しない
 - 🧪 pytest のテスト DB をプロセスごとの一時ファイルに分離（並行実行で互いのテーブルを drop していた問題の再発防止）
 - 🖥️ LandingView の実測でない数値（1,284 / 248 / 97.3% / 6）を機能の事実表示へ置換。AppsView の全カードで Space 押下時に preventDefault
-- 🧹 tests/ の未使用 import 16 件を解消し、CI の ruff 対象に `tests/` `scripts/` を追加
+- 🧹 tests/ の未使用 import 16 件を解消（CI の ruff 対象への `tests/` `scripts/` 追加は workflow 権限が必要なため別途適用）
 - 🔒 vitest 4.1.9 → 4.1.11（GHSA-82fw-gwwq-j7x9 / CWE-22、dev 依存のみ）で `npm audit` 0 件
 - 📄 設計メモ `docs/architecture/apps-distribution-settings.md`（配布設定トグルの扱い・要判断）、runbook §4.3、ブランチ棚卸しレポート
 
