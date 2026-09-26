@@ -1,4 +1,5 @@
 """Tests for services/deletion_job.py — GDPR Art.17 physical deletion job."""
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
@@ -7,7 +8,10 @@ from unittest.mock import patch, MagicMock
 # helpers
 # ---------------------------------------------------------------------------
 
-def _make_doc(db, owner_id: str, deletion_requested_at=None, file_path: str = "/tmp/fake.pdf"):
+
+def _make_doc(
+    db, owner_id: str, deletion_requested_at=None, file_path: str = "/tmp/fake.pdf"
+):
     from models.document import Document, DocumentType
 
     doc = Document(
@@ -49,6 +53,7 @@ def _make_user(db, email: str = "owner@example.com"):
 # run_deletion_job
 # ---------------------------------------------------------------------------
 
+
 class TestRunDeletionJob:
     def test_no_candidates_returns_zero(self, db_session):
         from services.deletion_job import run_deletion_job
@@ -81,7 +86,12 @@ class TestRunDeletionJob:
         fake_file.write_bytes(b"pdf data")
 
         requested_at = datetime.now(timezone.utc) - timedelta(days=31)
-        doc = _make_doc(db_session, user.id, deletion_requested_at=requested_at, file_path=str(fake_file))
+        doc = _make_doc(
+            db_session,
+            user.id,
+            deletion_requested_at=requested_at,
+            file_path=str(fake_file),
+        )
         doc_id = doc.id
 
         with patch("services.deletion_job.create_chained_audit_log") as mock_audit:
@@ -103,7 +113,12 @@ class TestRunDeletionJob:
 
         user = _make_user(db_session)
         requested_at = datetime.now(timezone.utc) - timedelta(days=45)
-        doc = _make_doc(db_session, user.id, deletion_requested_at=requested_at, file_path="/nonexistent/path.pdf")
+        doc = _make_doc(
+            db_session,
+            user.id,
+            deletion_requested_at=requested_at,
+            file_path="/nonexistent/path.pdf",
+        )
         doc_id = doc.id
 
         with patch("services.deletion_job.create_chained_audit_log") as mock_audit:
@@ -123,7 +138,10 @@ class TestRunDeletionJob:
         requested_at = datetime.now(timezone.utc) - timedelta(days=60)
         _make_doc(db_session, user.id, deletion_requested_at=requested_at)
 
-        with patch("services.deletion_job._physically_delete", side_effect=RuntimeError("disk error")):
+        with patch(
+            "services.deletion_job._physically_delete",
+            side_effect=RuntimeError("disk error"),
+        ):
             result = run_deletion_job(db_session, grace_days=30)
 
         assert result["errors"] == 1
@@ -146,7 +164,12 @@ class TestRunDeletionJob:
         fake_file.write_bytes(b"data")
 
         requested_at = datetime.now(timezone.utc) - timedelta(days=35)
-        _make_doc(db_session, user.id, deletion_requested_at=requested_at, file_path=str(fake_file))
+        _make_doc(
+            db_session,
+            user.id,
+            deletion_requested_at=requested_at,
+            file_path=str(fake_file),
+        )
 
         with patch("services.deletion_job.create_chained_audit_log") as mock_audit:
             mock_audit.return_value = MagicMock(id="audit-003")
@@ -177,7 +200,12 @@ class TestRunDeletionJob:
 
         # 10 days ago — past a 7-day grace but within 30-day default
         requested_at = datetime.now(timezone.utc) - timedelta(days=10)
-        _make_doc(db_session, user.id, deletion_requested_at=requested_at, file_path=str(fake_file))
+        _make_doc(
+            db_session,
+            user.id,
+            deletion_requested_at=requested_at,
+            file_path=str(fake_file),
+        )
 
         with patch("services.deletion_job.create_chained_audit_log") as mock_audit:
             mock_audit.return_value = MagicMock(id="audit-004")

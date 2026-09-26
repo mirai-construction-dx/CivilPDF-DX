@@ -37,7 +37,9 @@ describe("CSV export download helpers", () => {
   it("downloadDocumentsCsv downloads a blob with the server filename", async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: new Blob(["a,b"]),
-      headers: { "content-disposition": 'attachment; filename="documents-2026.csv"' },
+      headers: {
+        "content-disposition": 'attachment; filename="documents-2026.csv"',
+      },
     });
 
     await downloadDocumentsCsv({ project_id: "p1" });

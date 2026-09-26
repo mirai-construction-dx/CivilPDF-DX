@@ -210,11 +210,7 @@ class TestDxSyncMetrics:
         )
         assert forbidden.status_code == 403
 
-        rows = (
-            db_session.query(DxSyncMetric)
-            .order_by(DxSyncMetric.created_at)
-            .all()
-        )
+        rows = db_session.query(DxSyncMetric).order_by(DxSyncMetric.created_at).all()
         assert [r.event_type for r in rows] == ["success", "error"]
         assert rows[0].status_code == 200
         assert rows[0].document_id == doc.id

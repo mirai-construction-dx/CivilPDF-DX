@@ -21,6 +21,7 @@ jobs:
       - run: ruff check src/console/backend/
       - run: ruff check tests/ scripts/
       - run: ruff format --check src/console/backend/
+      - run: ruff format --check tests/ scripts/
 
   backend-test:
     name: Backend Tests
@@ -229,6 +230,7 @@ jobs:
           cache-dependency-path: src/console/frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run test
       - run: npm run build
 

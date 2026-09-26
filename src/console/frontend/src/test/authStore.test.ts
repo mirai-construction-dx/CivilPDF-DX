@@ -54,7 +54,10 @@ describe("useAuthStore", () => {
     localStorage.setItem("access_token", "abc");
     localStorage.setItem("refresh_token", "xyz");
     localStorage.setItem("theme", "dark");
-    useAuthStore.setState({ isAuthenticated: true, user: { id: "1" } as never });
+    useAuthStore.setState({
+      isAuthenticated: true,
+      user: { id: "1" } as never,
+    });
 
     useAuthStore.getState().clearAuth();
 

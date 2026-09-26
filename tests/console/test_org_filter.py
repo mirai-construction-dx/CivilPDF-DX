@@ -1,4 +1,5 @@
 """Phase 8 P5: organization_id filter tests for list_projects and list_documents."""
+
 import io
 import sys
 import os
@@ -21,7 +22,9 @@ def _create_org(db, name: str, code: str) -> Organization:
     return org
 
 
-def _create_project_in_org(client, db_session, admin_token: str, name: str, code: str, org_id: str) -> str:
+def _create_project_in_org(
+    client, db_session, admin_token: str, name: str, code: str, org_id: str
+) -> str:
     resp = client.post(
         "/api/v1/projects/",
         json={"name": name, "code": code},
@@ -40,7 +43,9 @@ def _upload_doc(client, admin_token: str, project_id: str, title: str) -> str:
     resp = client.post(
         "/api/v1/documents/",
         data={"project_id": project_id, "title": title},
-        files={"file": (f"{title}.pdf", io.BytesIO(_make_pdf_bytes()), "application/pdf")},
+        files={
+            "file": (f"{title}.pdf", io.BytesIO(_make_pdf_bytes()), "application/pdf")
+        },
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert resp.status_code == 201
@@ -52,8 +57,12 @@ class TestListProjectsOrgFilter:
         org_a = _create_org(db_session, "本社", "HQ-A")
         org_b = _create_org(db_session, "東京支店", "BRANCH-TKY")
 
-        _create_project_in_org(client, db_session, admin_token, "道路工事", "RD-001", org_a.id)
-        _create_project_in_org(client, db_session, admin_token, "橋梁設計", "BR-001", org_b.id)
+        _create_project_in_org(
+            client, db_session, admin_token, "道路工事", "RD-001", org_a.id
+        )
+        _create_project_in_org(
+            client, db_session, admin_token, "橋梁設計", "BR-001", org_b.id
+        )
 
         resp = client.get(
             f"/api/v1/projects/?organization_id={org_a.id}",
@@ -64,12 +73,18 @@ class TestListProjectsOrgFilter:
         assert "道路工事" in names
         assert "橋梁設計" not in names
 
-    def test_filter_other_org_returns_correct_project(self, client, admin_token, db_session):
+    def test_filter_other_org_returns_correct_project(
+        self, client, admin_token, db_session
+    ):
         org_a = _create_org(db_session, "本社2", "HQ-B")
         org_b = _create_org(db_session, "大阪支店", "BRANCH-OSK")
 
-        _create_project_in_org(client, db_session, admin_token, "設計案件A", "DSG-001", org_a.id)
-        _create_project_in_org(client, db_session, admin_token, "設計案件B", "DSG-002", org_b.id)
+        _create_project_in_org(
+            client, db_session, admin_token, "設計案件A", "DSG-001", org_a.id
+        )
+        _create_project_in_org(
+            client, db_session, admin_token, "設計案件B", "DSG-002", org_b.id
+        )
 
         resp = client.get(
             f"/api/v1/projects/?organization_id={org_b.id}",
@@ -92,10 +107,16 @@ class TestListProjectsOrgFilter:
         org_a = _create_org(db_session, "本社3", "HQ-C")
         org_b = _create_org(db_session, "名古屋支店", "BRANCH-NGY")
 
-        _create_project_in_org(client, db_session, admin_token, "プロジェクトX", "PRJ-X01", org_a.id)
-        _create_project_in_org(client, db_session, admin_token, "プロジェクトY", "PRJ-Y01", org_b.id)
+        _create_project_in_org(
+            client, db_session, admin_token, "プロジェクトX", "PRJ-X01", org_a.id
+        )
+        _create_project_in_org(
+            client, db_session, admin_token, "プロジェクトY", "PRJ-Y01", org_b.id
+        )
 
-        resp = client.get("/api/v1/projects/", headers={"Authorization": f"Bearer {admin_token}"})
+        resp = client.get(
+            "/api/v1/projects/", headers={"Authorization": f"Bearer {admin_token}"}
+        )
         assert resp.status_code == 200
         names = [p["name"] for p in resp.json()]
         assert "プロジェクトX" in names
@@ -107,8 +128,12 @@ class TestListDocumentsOrgFilter:
         org_a = _create_org(db_session, "本社D", "HQ-D")
         org_b = _create_org(db_session, "福岡支店", "BRANCH-FKO")
 
-        proj_a = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトA", "DPJA-001", org_a.id)
-        proj_b = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトB", "DPJB-001", org_b.id)
+        proj_a = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトA", "DPJA-001", org_a.id
+        )
+        proj_b = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトB", "DPJB-001", org_b.id
+        )
 
         _upload_doc(client, admin_token, proj_a, "本社図面")
         _upload_doc(client, admin_token, proj_b, "支店図面")
@@ -126,8 +151,12 @@ class TestListDocumentsOrgFilter:
         org_a = _create_org(db_session, "本社E", "HQ-E")
         org_b = _create_org(db_session, "札幌支店", "BRANCH-SPR")
 
-        proj_a = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトC", "DPJC-001", org_a.id)
-        proj_b = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトD", "DPJD-001", org_b.id)
+        proj_a = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトC", "DPJC-001", org_a.id
+        )
+        proj_b = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトD", "DPJD-001", org_b.id
+        )
 
         _upload_doc(client, admin_token, proj_a, "本社仕様書")
         _upload_doc(client, admin_token, proj_b, "支店仕様書")
@@ -153,13 +182,19 @@ class TestListDocumentsOrgFilter:
         org_a = _create_org(db_session, "本社F", "HQ-F")
         org_b = _create_org(db_session, "仙台支店", "BRANCH-SDI")
 
-        proj_a = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトE", "DPJE-001", org_a.id)
-        proj_b = _create_project_in_org(client, db_session, admin_token, "文書プロジェクトF", "DPJF-001", org_b.id)
+        proj_a = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトE", "DPJE-001", org_a.id
+        )
+        proj_b = _create_project_in_org(
+            client, db_session, admin_token, "文書プロジェクトF", "DPJF-001", org_b.id
+        )
 
         _upload_doc(client, admin_token, proj_a, "全社共通資料A")
         _upload_doc(client, admin_token, proj_b, "全社共通資料B")
 
-        resp = client.get("/api/v1/documents/", headers={"Authorization": f"Bearer {admin_token}"})
+        resp = client.get(
+            "/api/v1/documents/", headers={"Authorization": f"Bearer {admin_token}"}
+        )
         assert resp.status_code == 200
         titles = [d["title"] for d in resp.json()]
         assert "全社共通資料A" in titles
