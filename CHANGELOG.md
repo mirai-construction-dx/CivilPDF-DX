@@ -8,6 +8,14 @@
 
 ## [Unreleased]
 
+### 2026-09-26 (16) — 文書の実態同期・/apps の E2E・スモーク拡張・開発環境の手順・リリース計画
+
+- 📄 system-architecture の GUI を「PDF Editor Client（Tauri v2・Windows・別リポジトリ）」に修正（旧: Electron / C++）、PostgreSQL 15 → 16。requirements §3.1・gui-screens に実装状況を注記
+- 🧪 Playwright E2E `e2e/apps.spec.ts`（Windows 2 形式のみ・macOS 後日対応カード・配布ポリシーでスイッチなし）
+- 🧪 `scripts/mvp-smoke.py` に「配布は Windows のみ・macOS は pending」の確認を追加（現行の MVP は再起動前のため FAIL を検出 = 検査が効いていることを確認）
+- 🐍 setup ガイドに固定バージョン venv によるテスト環境の手順を追加（ローカルのバージョンずれで出ていた警告が消え、`test_apps.py` が約 4 倍速に）。本番手順の TODO を runbook へのリンクに置換
+- 🏷️ リリース計画案 `reports/release/20260926-release-plan.md`（v0.9.0 の後付けタグ＋v0.10.0 を推奨・承認待ち）、引き継ぎレポート
+
 ### 2026-09-26 (15) — 反映前チェックスクリプト・MVP バックアップの除外・既知の制約の棚卸し
 
 - 🚀 `scripts/pre-deploy-check.sh` 追加（読み取りのみ）— checkout が main かつ origin/main と一致、追跡ファイルの変更なし（state.json は許容）、`.env` が group/others に権限なし（600 推奨）、ヘルス/バックアップ鮮度、ロールバック用イメージタグ、配布リンクと SHA-256 を確認。`.env` は APPS_* だけを読み、secret は出力しない。テスト 8 件
