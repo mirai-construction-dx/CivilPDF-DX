@@ -33,6 +33,9 @@ if [[ "${1:-}" == "--test" ]]; then
   exit $rc
 fi
 
+# Daily PDF Editor download-link watch (self-throttled, never fails the monitor).
+"$PROJECT_DIR/scripts/editor-asset-watch.sh" || true
+
 now="$(date +%s)"
 if "$PROJECT_DIR/scripts/healthcheck-civilpdf.sh" --quiet; then
   if [[ -f "$DOWN_FILE" ]]; then

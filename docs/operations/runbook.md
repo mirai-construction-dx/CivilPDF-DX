@@ -131,6 +131,21 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - 失敗時はアラートメール送信＋`~/.local/state/civildx-drill/drill.log` に記録
 - 手動実行: `./scripts/restore-drill.sh`
 
+## 4.3 PDF Editor 配布リンク監視と新版の配布
+
+- **日次監視**: `scripts/monitor-civilpdf.sh`（5 分毎）が `scripts/editor-asset-watch.sh` を呼び、
+  `CIVILPDF_ASSET_CHECK_INTERVAL`（既定 1440 分＝1 日）に 1 回だけ `scripts/check-editor-assets.py` を実行する
+  - 配布元 URL は `APPS_RELEASE_BASE_URL`、未設定なら稼働中の backend コンテナ（`CIVILPDF_BACKEND_CONTAINER`、既定 `civilpdf-dx-backend-1`）の env から読む。どちらも空ならスキップ
+  - アセットに届かなければ「PDF Editor 配布リンク異常」を 1 回メール通知し、復旧時に 1 回通知する（ヘルス監視の終了コードには影響しない）
+  - 手動実行: `./scripts/editor-asset-watch.sh --force`（ログは `~/.local/state/civildx-monitor/monitor.log`）
+- **新版の配布手順**（詳細は [app-distribution.md](../deployment/app-distribution.md) §3）
+  1. Editor の Windows インストーラー（`.exe` / `.msi`）を取得し、Editor の更新署名鍵（minisign）で署名を検証する
+  2. `gh release create editor-v<版> -R mirai-construction-dx/CivilPDF-DX --latest=false ...` で公開する
+  3. `apps.py` の `_VERSION` などを PR で更新してマージする
+  4. `APPS_RELEASE_BASE_URL`・`APPS_SHA256_WIN_EXE` / `APPS_SHA256_WIN_MSI` を更新し、compose を再ビルドする
+  5. `python scripts/check-editor-assets.py --verify-sha256` が全件 PASS になることを確認する
+- **ロールバック**: `APPS_RELEASE_BASE_URL` を前の版のタグに戻す（または空にして「近日公開予定」表示にする）
+
 ## 5. ロールバック
 
 1. アプリロールバック: 直前リリースの commit を checkout → frontend 再ビルド → backend/frontend 再起動
