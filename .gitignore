@@ -43,6 +43,8 @@ htmlcov/
 *.db-shm
 *.sqlite3
 .mvp-data/
+# Manual backups of the MVP data dir (SQLite DB + uploads) — never commit
+.mvp-data.bak-*/
 
 # Logs
 *.log

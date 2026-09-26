@@ -8,6 +8,13 @@
 
 ## [Unreleased]
 
+### 2026-09-26 (15) — 反映前チェックスクリプト・MVP バックアップの除外・既知の制約の棚卸し
+
+- 🚀 `scripts/pre-deploy-check.sh` 追加（読み取りのみ）— checkout が main かつ origin/main と一致、追跡ファイルの変更なし（state.json は許容）、`.env` が 600、ヘルス/バックアップ鮮度、ロールバック用イメージタグ、配布リンクと SHA-256 を確認。`.env` は APPS_* だけを読み、secret は出力しない。テスト 8 件
+- 🔒 `.gitignore` に `.mvp-data.bak-*/` を追加（MVP の SQLite とアップロードのバックアップを誤ってコミットしないように）
+- 📄 runbook: デプロイ手順の最初に反映前チェックを追加、既知の制約を更新（#62/#94 close・ecdsa 解消・macOS は #147）。反映チェックリストにも組み込み
+- 🔒 pip-audit / npm audit ともに 0 件を確認
+
 ### 2026-09-26 (14) — 運用・品質の底上げ（配布リンク日次監視・テスト DB 分離・作り話の数値撤去・依存脆弱性ゼロ）
 
 - 🔍 `scripts/editor-asset-watch.sh` 追加・`monitor-civilpdf.sh` から日次実行 — PDF Editor 配布リンクが届かなければメール通知（復旧時も 1 回）。ヘルス監視の結果には影響しない

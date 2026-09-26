@@ -41,6 +41,10 @@ migration、DB、認証への変更はありません。
     --base-url https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/editor-v1.12.6
   ```
 
+- [ ] **まとめて確認する**（読み取りのみ）: `./scripts/pre-deploy-check.sh` を実行し、`0 fail` を確認する
+  - タグ付け前なら「ロールバック用タグなし」の WARN が出る。上のタグ付けを済ませてから再実行する
+  - env の更新後にもう一度実行すると、配布リンクと SHA-256 まで確認できる
+
 ## 🔧 1. env の更新（`.env`・Git 管理外）
 
 `.env` の `APPS_RELEASE_BASE_URL=`（現在は空）を次の値にし、SHA-256 の 2 行を追加する:

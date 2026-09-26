@@ -27,6 +27,7 @@
 
 ## 2. デプロイ手順（新リリース）
 
+0. 反映前の読み取り専用チェック: `./scripts/pre-deploy-check.sh`（checkout が main かつ origin/main と一致・追跡ファイルの変更なし・`.env` が 600・ヘルス/バックアップ鮮度・ロールバック用イメージタグ・配布リンク。FAIL が 0 件になるまで進めない）
 0. リリース前確認: `./scripts/verify-version-sync.sh` で `VERSION`・env 例・文書の整合を確認
 1. バックアップ取得: `./scripts/backup-production.sh`
 2. リポジトリを main の検証済み commit へ更新（本番チェックアウトは `~/Projects/Mirai-Construction-DX/CivilPDF-DX`。2026-09 の GitHub 組織移管に伴い旧 `~/Projects/Mirai-DX-Project/CivilPDF-DX` から移動・旧パスは消滅。compose プロジェクト名はディレクトリ名 `CivilPDF-DX` 由来の `civilpdf-dx` のままなので、新パスから同じ本番スタックを操作できる。本番 env はこの checkout の `.env`（Git 管理外））。以降の手順（イメージ再ビルド docker compose -f docker-compose.prod.yml up -d --build、スモーク ./scripts/healthcheck-civilpdf.sh、ログ確認 docker compose logs --tail 100 backend）は compose 本番構成で実施する。旧構成（ホスト直 uvicorn 8180 / vite preview 5182）は 2026-09-18 に退役: 旧 civilpdf-backend.service は Neon 失効認証情報（2026-08-29 失効）を参照し続け /health が 200 でも DB 依存リクエストが 500 の状態で稼働していた（2026-09-18 実測）、旧 civilpdf-backup.service は 21日間 Neon への pg_dump に失敗し続けていた。退役手順は deploy/civilpdf-backend.service 等の RETIRED 注記を参照。
@@ -204,9 +205,8 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
   どちらも独立した git checkout であり、**変更を一方に入れても他方には反映されない**。
   恒久的には専用リリースディレクトリへ分離することを推奨する
 - **共有 checkout の制約**: 本番サービス（systemd units・MVP backend/frontend）と監視/訓練スクリプト、本番 compose のビルドコンテキストはリポジトリの作業ツリー（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）から起動する。別セッションが feature branch へ checkout を切り替えると、その間スクリプト/コードが一時的に不在になり、monitor timer 等が `203/EXEC` で失敗しうる（2026-08-06 に実測）。運用中は main を checkout した状態を維持し、複数セッションで並行作業する場合は `git worktree` を利用すること。恒久対策は専用リリースディレクトリへの分離（要設計判断）
-- Issue #62: PDF Editor デスクトップ本体は別リポジトリ（CivilPDF-Editor）で開発継続
-- Issue #94: 配布同期の完了報告（管理タスク）
-- Issue #106: ecdsa advisory（upstream 修正待ち・CI 明示 ignore）
+- PDF Editor 本体は別リポジトリ（CivilPDF-Editor・非公開）で開発。コンソールは配布窓口のみ（Windows だけ提供。macOS は後日対応: Issue #147）。Issue #62・#94 は 2026-09-26 に完了として close
+- ✅ ecdsa advisory（旧 Issue #106）: 依存から ecdsa が外れ、CI の ignore も撤去済み。pip-audit・npm audit ともに 0 件（2026-09-26 確認）
 - 外部アラートはメール（msmtp/Gmail）のみ。Slack/Teams 等へ拡張する場合は `scripts/alert-notify.sh` を拡張
 - 復元訓練は四半期 timer で自動化済み。訓練ログは `~/.local/state/civildx-drill/drill.log`
 - バージョン: リポジトリ `VERSION` は 0.9.0。`scripts/verify-version-sync.sh` は CI で毎 PR 実行され、
@@ -214,4 +214,5 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - CI 強化（2026-08-12）: `gitleaks`（secret scan）・`npm audit`・スクリプト構文/バージョン整合チェックを追加
 - GitHub 保護: ruleset `central-auto-merge`（2026-08-15 作成）が有効で、
   12 個の必須ステータスチェック通過 + squash merge のみ + force push 禁止。
+  Backend Lint は 2026-09-26（#146）から `tests/` と `scripts/` も ruff の検査対象
   `main` への直接 push は不可（PR 経由のみ）
