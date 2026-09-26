@@ -404,11 +404,13 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ")
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
                     onShowModal({
                       title: `${ch.label} チャンネル`,
                       body: buildChannelModalBody(ch),
                     });
+                  }
                 }}
               >
                 <div className="ep-channel-head">
@@ -495,8 +497,10 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ")
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
                   onShowModal({ title: dt.name, body: targetModalBody(dt) });
+                }
               }}
             >
               <h5>
@@ -610,11 +614,13 @@ export const AppsView: FC<ViewProps> = ({ onShowModal, onShowToast }) => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       onShowModal({
                         title: `リリースノート v${rn.version}`,
                         body,
                       });
+                    }
                   }}
                 >
                   <div className="ep-rn-meta">

@@ -239,6 +239,21 @@ describe("AppsView", () => {
     expect(body).not.toContain("v1.2.4");
   });
 
+  it("opens card modals only on Enter/Space from the keyboard", async () => {
+    const user = userEvent.setup();
+    const props = renderView();
+    const card = (await screen.findByText("安定版")).closest(
+      '[role="button"]',
+    ) as HTMLElement;
+    card.focus();
+    await user.keyboard("a");
+    expect(props.onShowModal).not.toHaveBeenCalled();
+    await user.keyboard(" ");
+    expect(props.onShowModal).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Stable チャンネル" }),
+    );
+  });
+
   it("marks deploy targets and KPI as demo data", async () => {
     renderView();
     await waitFor(() => {
