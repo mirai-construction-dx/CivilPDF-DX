@@ -7,9 +7,9 @@
     "phase_mode": "release-ready"
   },
   "phase": {
-    "current": "production-migration-complete",
+    "current": "editor-distribution-windows-v1.12.6",
     "week": 4,
-    "milestone": "2026-09-18: PR #136 マージ — 本番DBを Neon からローカル PostgreSQL（compose の db コンテナ）へ完全移行し、運用系（backup/monitor/drill/retention）を実本番構成へ統合。Neon 依存ゼロ。実測: 本番DB初バックアップ PASS・復元訓練 DRILL PASS・CI 12/12。残: 本番 compose イメージの再ビルド・デプロイと post-deploy 検証（新イメージに /health/ready・healthcheck 修正・9コミット分の機能を含む）"
+    "milestone": "2026-09-26: PR #141〜#144 マージ — PDF Editor 配布を Windows のみ（macOS 後日対応）・v1.12.6・配布元を本リポジトリ Release editor-v1.12.6（minisign 検証済み）へ移行、配布リンク日次監視、テスト DB 分離、偽数値撤去、npm audit 0、配布設定トグル撤去（案A）。本番反映（.env の APPS_* 設定 + compose 再ビルド）は人間作業: reports/deploy/20260926-editor-distribution-rollout.md。本番 checkout は ~/Projects/Mirai-Construction-DX/CivilPDF-DX（旧 Mirai-DX-Project パスは消滅）"
   },
   "kpi": {
     "ci_success_rate": 1,
@@ -46,9 +46,9 @@
     "stable": true,
     "deploy_ready": true,
     "deploy_ready_note": "2026-06-20 CTO 再評価: 本番認証フローは完備（Login.tsx パスワード+M365 / api/auth login+getMe / axios Bearer+401 refresh / EnterpriseLayout ログアウト / PR #60 で本番ゲート有効）。テスト: Login 4 + ProtectedRoute redirect 2 + getInitialAuthState PROD/DEV 3 + authStore 4。当初の『ログイン UI 未実装』判断は誤りで、ログイン UI は最初から存在し #55/#56 がそれを意図的にバイパスしていた。PR #60 でバイパスを DEV 限定化し本番は完成済みログインフローを使用。残る本番化作業は人間タスク（管理者ユーザー作成 scripts/create_admin.py・docker compose・secrets 設定）のみ。",
-    "last_pr": 136,
-    "last_pr_status": "merged (2026-09-18) — 本番DBをNeonからローカルPostgreSQLへ完全移行 + 運用系をcompose実体へ統合。CI 12/12 success。本番実体（civilpdf-dx composeスタック）の特定・旧systemd運用系（Neon失効認証情報を参照）の退役・backup compose モード（本番DB初の有効バックアップ取得 42,882バイト）・restore-drill DRILL PASS（civildx_drill・alembic head・認証フロー）・frontend healthcheck 58,073回失敗の修正（IPv6/IPv4）・/health/ready passthrough（監視の偽陽性解消）・retention-job exit code 修正・CSV 413 定数互換修正。検証: backend 482 passed/4 skipped・frontend vitest 277・Playwright 25・ruff 0.8.6 clean。デプロイ（main 60ff8f3 の compose 再ビルド）は残作業。",
-    "last_merged_pr": 123,
+    "last_pr": 144,
+    "last_pr_status": "merged (2026-09-26) — Round C: 配布リンク日次監視・テスト DB 分離・偽数値撤去・vitest 4.1.11・配布設定トグル撤去。CI 13/13 success（Windows 11 含む）",
+    "last_merged_pr": 144,
     "mvp_20260813": {
       "status": "GO（MVP 公開済み・検証 15/15 PASS）",
       "production_url": "https://civilpdf.mirai-dx-platform.com/",
@@ -388,8 +388,9 @@
     "[保留/macOS] PDF Editor の macOS 配布は後日対応（ペンディング, 2026-09-26 決定）。再開時: Developer ID 署名・notarization・.dmg/.pkg 要否を確認し apps.py の _PENDING_PLATFORMS から _build_packages へ戻す",
     "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）",
     "[人間作業] 本番 env に APPS_RELEASE_BASE_URL（editor-v1.12.6）と APPS_SHA256_WIN_EXE/MSI を設定し compose 再ビルド（Release は 2026-09-26 公開・検証済み）",
-    "[要確認] fix/production-reliability-hardening-20260918（未 push・#136 取り込み済み推定）の差分確認後に削除",
-    "[人間作業] GitHub PAT に Workflows: Read and write を付与 → ci.yml に ruff check tests/ scripts/ を追加する PR"
+    "[人間作業] GitHub PAT に Workflows: Read and write を付与 → ci.yml に ruff check tests/ scripts/ を追加する PR",
+    "[要承認] リモートブランチ 33 件 + ローカル fix/production-reliability-hardening-20260918 の削除 — reports/remote-branch-inventory-20260926.md",
+    "[P3] ローカル Python 環境のドリフト（fastapi 0.139.2 / httpx 0.27.2 ≠ requirements の 0.136.3 / 0.28.1）→ requirements-dev で venv を作り直すと Starlette の httpx 非推奨警告が消える見込み"
   ],
   "learning": {
     "failure_patterns": [
