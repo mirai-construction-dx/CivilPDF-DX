@@ -39,11 +39,19 @@ check_contains "deploy env example" "$ROOT/deploy/civilpdf.env.example" "APP_VER
 check_contains "dev env example" "$ROOT/.env.example" "APP_VERSION=$VERSION"
 check_contains "prod env example" "$ROOT/.env.prod.example" "APP_VERSION=$VERSION"
 check_contains "runbook" "$ROOT/docs/operations/runbook.md" "現在 $VERSION"
+check_contains "backend env example" "$ROOT/src/console/backend/.env.example" "APP_VERSION=$VERSION"
 
 # Warnings — these are app-code/release metadata outside ops/docs scope.
 if [[ -f "$ROOT/src/console/backend/config.py" ]] && \
    grep -q 'app_version: str = "0.1.0"' "$ROOT/src/console/backend/config.py"; then
   echo "WARN config.py default app_version is still 0.1.0 (dev default; sync at release)"
+fi
+
+# The UI badge reads the version from /health at runtime; a literal version
+# string there goes stale (it said v0.4.2 until 0.10.0).
+if grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+ · Enterprise' "$ROOT/src/console/frontend/src/components/enterprise/EnterpriseLayout.tsx" 2>/dev/null; then
+  echo "ERROR UI badge in EnterpriseLayout.tsx has a hard-coded version" >&2
+  FAIL=1
 fi
 
 if [[ -f "$ROOT/src/console/frontend/package.json" ]] && \

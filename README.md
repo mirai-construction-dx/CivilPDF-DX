@@ -198,4 +198,4 @@ https://civilpdf-mvp.mirai-dx-platform.com/
 
 ---
 
-_最終更新: 2026-08-13 | MVP/Prototype 公開（v0.9.0）— LICENSE 修復・PyJWT 移行・認証レート制限・CSV 出力・架空ダミーデータ・MVP 用公開 URL_
+_最終更新: 2026-09-26 | v0.10.0 — PDF Editor 配布の Windows 化・配布リンク監視・反映前チェック・AI 停止スイッチ・CI/コード品質の強化（詳細は [CHANGELOG](CHANGELOG.md)）_

@@ -20,7 +20,7 @@
 | スタック制御 | system unit `civilpdf-dx.service`（`/etc/systemd/system/`） |
 | Tunnel | cloudflared（system unit `civilpdf-dx-cloudflared.service` / `~/.cloudflared/civilpdf-dx-config.yml` → `127.0.0.1:18970`） |
 | 環境設定 | `<production checkout>/.env`（git 管理外・compose 用）＋ `~/.config/civilpdf/civilpdf.env`（運用スクリプト用・0600） |
-| バージョン | 正本はリポジトリ `VERSION`（現在 0.9.0）。`APP_VERSION` でデプロイ時上書き。整合検証は `scripts/verify-version-sync.sh` |
+| バージョン | 正本はリポジトリ `VERSION`（現在 0.10.0）。`APP_VERSION` でデプロイ時上書き。整合検証は `scripts/verify-version-sync.sh` |
 
 > **旧構成（ホスト直 uvicorn 8180 + vite preview 5182）は 2026-09-18 に退役。**
 > 退役手順は §2.1 を参照。
@@ -209,8 +209,8 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - ✅ ecdsa advisory（旧 Issue #106）: 依存から ecdsa が外れ、CI の ignore も撤去済み。pip-audit・npm audit ともに 0 件（2026-09-26 確認）
 - 外部アラートはメール（msmtp/Gmail）のみ。Slack/Teams 等へ拡張する場合は `scripts/alert-notify.sh` を拡張
 - 復元訓練は四半期 timer で自動化済み。訓練ログは `~/.local/state/civildx-drill/drill.log`
-- バージョン: リポジトリ `VERSION` は 0.9.0。`scripts/verify-version-sync.sh` は CI で毎 PR 実行され、
-  `docs/operations/runbook.md` の「現在 0.9.0」表記を含めて同期を検証する。ただし git タグ `v0.9.0` は未付与（リリース時に付与）
+- バージョン: リポジトリ `VERSION` は 0.10.0。`scripts/verify-version-sync.sh` は CI で毎 PR 実行され、
+  `docs/operations/runbook.md` の「現在 0.10.0」表記を含めて同期を検証する。git タグ `v0.9.0`（2026-08-13 時点に後付け）と `v0.10.0` を付与済み
 - CI 強化（2026-08-12）: `gitleaks`（secret scan）・`npm audit`・スクリプト構文/バージョン整合チェックを追加
 - GitHub 保護: ruleset `central-auto-merge`（2026-08-15 作成）が有効で、
   12 個の必須ステータスチェック通過 + squash merge のみ + force push 禁止。
