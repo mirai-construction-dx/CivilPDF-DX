@@ -26,7 +26,7 @@ flowchart TB
 
     subgraph external["外部サービス"]
         CLAUDE["Claude API\nAI検索・要約・OCR補正"]
-        ENTRA["Entra ID (AAD)\nOIDC SSO\n(将来実装)"]
+        ENTRA["Entra ID (AAD)\nOIDC / M365 SSO\n(実装済み)"]
         HENNGE["HENNGE ONE\nSAML / OIDC\n(将来実装)"]
     end
 
@@ -57,7 +57,7 @@ flowchart TB
 | 責務       | PDF 閲覧・注釈・OCR・図面比較・電子印鑑・電子納品チェック・AI検索  |
 | オフライン | ローカルキャッシュによるオフライン動作対応（同期パネルで競合解決） |
 | 通信       | Backend API へ REST/HTTPS で接続                                   |
-| 認証       | JWT Bearer トークン（将来: Entra ID OIDC PKCE）                    |
+| 認証       | JWT Bearer トークン（Entra ID の OIDC SSO は WebUI 側で実装済み。§3.2 参照） |
 | 実装状況   | 計画中（MVP フェーズ外）                                           |
 
 ### 2.2 管理コンソール（WebUI）
@@ -130,13 +130,15 @@ flowchart TB
 | 構造 | `uploads/{project_id}/{uuid}.pdf`                                         |
 | 制限 | PDF のみ (`application/pdf`)、最大サイズ `settings.max_file_size_mb` MB   |
 
-### 2.6 AI / Claude API（将来実装）
+### 2.6 AI / Claude API（実装済み）
 
-| 項目     | 内容                                                                |
-| -------- | ------------------------------------------------------------------- |
-| 用途     | OCR テキスト補正、自然言語検索、文書要約、Q&A、電子納品チェック支援 |
-| 実装予定 | 非同期ワーカー経由で呼び出し（Celery / ARQ）                        |
-| SDK      | Anthropic Python SDK                                                |
+| 項目       | 内容                                                                                          |
+| ---------- | --------------------------------------------------------------------------------------------- |
+| 用途       | 文書の分類・構造化抽出・要約（`/api/v1/ai/*`）、セマンティック検索のクエリ拡張                |
+| 呼び出し   | API リクエスト内で同期的に呼ぶ（非同期ワーカーは未導入）                                      |
+| 停止スイッチ | 管理者が `/api/v1/ai-config` で有効化したときだけ呼ぶ（既定は無効・fail closed。#151 で全経路に適用） |
+| キー       | DB に Fernet 暗号化で保存（`/api/v1/ai-config`）。なければ環境変数 `ANTHROPIC_API_KEY`        |
+| SDK        | Anthropic Python SDK                                                                          |
 
 ---
 
@@ -175,26 +177,30 @@ sequenceDiagram
     API-->>WebUI: 新しい {access_token, refresh_token}
 ```
 
-### 3.2 将来の Entra ID OIDC 認証
+### 3.2 Entra ID 認証（WebUI・実装済み）
+
+WebUI には Entra ID による 2 つのログイン経路がある。
+
+| 経路 | エンドポイント | 性質 |
+| --- | --- | --- |
+| OIDC SSO（推奨） | `GET /api/v1/auth/oidc/login` → `GET /api/v1/auth/oidc/callback` | 認可コードフロー＋PKCE をサーバー側で処理。未設定なら 503 |
+| M365 ブリッジ | `POST /api/v1/auth/m365/login` | **OIDC ではない**。メールアドレスを受け取り、Graph の Client Credentials でテナント在籍を確認する非対話ブリッジ。**LAN 限定**（`M365_ALLOWED_NETWORKS` が未設定なら 503 で拒否）。公開経路には出さない |
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant GUI as GUIアプリ / WebUI
+    participant Web as WebUI
     participant API as Backend API
     participant Entra as Entra ID (AAD)
 
-    User->>GUI: ログインボタン
-    GUI->>Entra: 認可リクエスト (PKCE)<br/>response_type=code<br/>scope=openid profile email
-    Entra->>User: Microsoft ログイン画面
-    User->>Entra: 認証情報入力
-    Entra-->>GUI: 認可コード (code)
-    GUI->>Entra: POST /token<br/>code + code_verifier
-    Entra-->>GUI: id_token + access_token
-    GUI->>API: POST /api/v1/auth/oidc<br/>Bearer {id_token}
-    API->>Entra: JWKS エンドポイントで検証
+    User->>Web: 「組織アカウントでログイン」
+    Web->>API: GET /api/v1/auth/oidc/login
+    API-->>User: Entra の認可エンドポイントへリダイレクト（PKCE・state）
+    User->>Entra: Microsoft ログイン
+    Entra-->>API: GET /api/v1/auth/oidc/callback?code&state
+    API->>Entra: トークン交換（code + code_verifier）と ID トークン検証
     API->>API: ユーザー DB 照合 / 初回プロビジョニング
-    API-->>GUI: CivilPDF JWT (access_token + refresh_token)
+    API-->>Web: CivilPDF JWT（access_token + refresh_token）
 ```
 
 ---
@@ -338,5 +344,5 @@ Namespace: civilpdf-dx
 | `UPLOAD_DIR`                  | PDF 保存ディレクトリ             | `/app/uploads`                            |
 | `MAX_FILE_SIZE_MB`            | PDF 最大サイズ                   | `100`                                     |
 | `CORS_ORIGINS`                | CORS 許可オリジン                | `https://console.example.com`             |
-| `CLAUDE_API_KEY`              | Claude API キー（将来）          | `sk-ant-...`                              |
-| `AZURE_CLIENT_ID`             | Entra ID クライアント ID（将来） | `xxxxxxxx-...`                            |
+| `ANTHROPIC_API_KEY`           | Claude API キー（任意・DB 設定がない場合に使用） | `sk-ant-...`                   |
+| `ENTRA_TENANT_ID` / `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` | Entra ID のテナント・アプリ登録（OIDC SSO / M365 連携） | `xxxxxxxx-...` |

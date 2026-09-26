@@ -143,6 +143,8 @@ https://<your-domain>/api/v1/
 
 ### 検索 / Editor 連携 / リビジョン / プライバシー / アプリ配布
 
+> 🔒 **AI の停止スイッチ**: AI 分類・抽出・要約とセマンティック検索／サジェストは、管理者が `/api/v1/ai-config` で `enabled=true` にしたときだけ外部 AI を呼ぶ（既定は無効・fail closed）。無効な間、`/ai/*` は **503**（「AI 機能は無効化されています」）を返し、検索は元のクエリだけで動く。API キー（DB に暗号化保存、なければ `ANTHROPIC_API_KEY`）があっても、無効なら呼び出さない。例外は管理者の `POST /api/v1/ai-config/test`（有効化前のキー確認用。`ping` だけを送り、文書データは送らない）。セマンティック検索のクエリ拡張は、費用を抑えるため設定に関係なく Haiku を使う。
+
 | メソッド | パス | 説明 |
 |---|---|---|
 | GET | `/api/v1/search/documents` | 全文検索（SQLite FTS5 / PG tsvector） |
