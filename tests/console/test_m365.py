@@ -101,7 +101,9 @@ class TestM365Config:
         assert row.client_secret_enc != ""
         assert row.client_secret_enc != "super-secret-value"
         # Round-trip via the service decrypts back to the original plaintext
-        assert m365_service.decrypt_secret(row.client_secret_enc) == "super-secret-value"
+        assert (
+            m365_service.decrypt_secret(row.client_secret_enc) == "super-secret-value"
+        )
 
     def test_update_config_non_admin_forbidden(self, client, viewer_token):
         resp = client.put(
@@ -113,9 +115,7 @@ class TestM365Config:
 
 
 class TestM365TestConnection:
-    def test_test_connection_returns_503_when_config_missing(
-        self, client, admin_token
-    ):
+    def test_test_connection_returns_503_when_config_missing(self, client, admin_token):
         # Default singleton has enabled=False → test_connection returns {ok:False, stage:"config"}
         resp = client.post(
             "/api/v1/m365/test-connection",

@@ -20,6 +20,7 @@ Configuration (CLI flag > environment variable > default):
 If a user with the given email already exists the script reports it and exits 0
 (idempotent — safe to re-run).
 """
+
 import argparse
 import os
 import sys
@@ -27,7 +28,10 @@ import sys
 # Allow running from the repository root without exporting PYTHONPATH.
 # (Inside the container the modules already sit next to this file on sys.path.)
 sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "console", "backend")
+    0,
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "src", "console", "backend"
+    ),
 )
 
 from database import SessionLocal, Base, engine  # noqa: E402
@@ -39,7 +43,9 @@ _DEFAULT_PASSWORD = "AdminPass123!"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create the initial admin user.")
-    parser.add_argument("--email", default=os.environ.get("ADMIN_EMAIL", "admin@example.com"))
+    parser.add_argument(
+        "--email", default=os.environ.get("ADMIN_EMAIL", "admin@example.com")
+    )
     parser.add_argument("--username", default=os.environ.get("ADMIN_USERNAME", "admin"))
     parser.add_argument(
         "--password", default=os.environ.get("ADMIN_PASSWORD", _DEFAULT_PASSWORD)
@@ -56,7 +62,9 @@ def main() -> int:
     try:
         existing = db.query(User).filter(User.email == args.email).first()
         if existing:
-            print(f"[skip] User already exists: {args.email} (role={existing.role.value})")
+            print(
+                f"[skip] User already exists: {args.email} (role={existing.role.value})"
+            )
             return 0
 
         user = User(
@@ -71,7 +79,9 @@ def main() -> int:
         db.commit()
         print(f"[ok] Admin user created: {args.email} (login with this email)")
         if args.password == _DEFAULT_PASSWORD:
-            print("[warn] Default password in use — change it immediately after first login.")
+            print(
+                "[warn] Default password in use — change it immediately after first login."
+            )
         return 0
     finally:
         db.close()

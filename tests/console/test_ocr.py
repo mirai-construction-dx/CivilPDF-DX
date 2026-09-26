@@ -78,7 +78,9 @@ class TestOcrApi:
             headers={"Authorization": f"Bearer {token}"},
         ).json()["id"]
 
-    def _create_document(self, client, token, project_id=None, pdf=None, code="OCR-001") -> str:
+    def _create_document(
+        self, client, token, project_id=None, pdf=None, code="OCR-001"
+    ) -> str:
         project_id = project_id or self._create_project(client, token, code=code)
         doc = client.post(
             "/api/v1/documents/",
@@ -154,7 +156,9 @@ class TestOcrApi:
         )
 
     # ── contract honesty ────────────────────────────────────────────────
-    def test_pdf_without_text_layer_is_reported_as_unsupported(self, client, admin_token):
+    def test_pdf_without_text_layer_is_reported_as_unsupported(
+        self, client, admin_token
+    ):
         """A missing text layer must be explicit, never a fake page of text."""
         doc_id = self._create_document(
             client, admin_token, pdf=_make_blank_pdf_bytes(), code="OCR-NOTEXT"
@@ -262,9 +266,9 @@ class TestOcrApi:
             json={"document_id": doc_id},
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
-        assert resp.status_code == 404, (
-            "viewer without project membership must not reach the document"
-        )
+        assert (
+            resp.status_code == 404
+        ), "viewer without project membership must not reach the document"
 
     def test_viewer_cannot_read_another_users_job(
         self, client, admin_token, viewer_token
@@ -277,9 +281,7 @@ class TestOcrApi:
         ).json()["job_id"]
 
         for path in (f"/api/v1/ocr/jobs/{job_id}", f"/api/v1/ocr/jobs/{job_id}/result"):
-            resp = client.get(
-                path, headers={"Authorization": f"Bearer {viewer_token}"}
-            )
+            resp = client.get(path, headers={"Authorization": f"Bearer {viewer_token}"})
             assert resp.status_code == 404, f"{path} leaked another user's job"
 
     def test_admin_can_extract_text_from_any_visible_document(
