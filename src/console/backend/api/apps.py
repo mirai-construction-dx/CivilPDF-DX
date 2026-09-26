@@ -213,13 +213,13 @@ _RELEASE_NOTES: list[ReleaseNote] = [
         channel="stable",
         release_date=_RELEASE_DATE,
         summary=(
-            f"v{_VERSION} 安定版 — Windows コード署名の検証を自己署名に対応"
+            f"v{_VERSION} 安定版 — Windows コード署名付きリリース"
             "（v1.3〜v1.12 の機能を継続搭載）"
         ),
         items=[
             ReleaseNoteItem(
-                type="FIX",
-                text="Windows 署名検証を自己署名証明書に対応（署名の存在・改ざんなし・署名者の一致で判定）",
+                type="IMP",
+                text="リリース工程の署名検証を自己署名証明書に対応（アプリの機能変更なし）",
             ),
             ReleaseNoteItem(
                 type="SEC",
@@ -255,7 +255,7 @@ _RELEASE_NOTES: list[ReleaseNote] = [
             ),
             ReleaseNoteItem(
                 type="NOTE",
-                text="自己署名のため Windows SmartScreen の警告が表示される場合があります（社内信頼ストア配布で解消）",
+                text="自己署名のため Windows SmartScreen の警告が表示される場合があります（社内の信頼された発行元への証明書配布で軽減）",
             ),
             ReleaseNoteItem(
                 type="NOTE",
@@ -265,8 +265,8 @@ _RELEASE_NOTES: list[ReleaseNote] = [
         highlights=(
             f"v{_VERSION} — リリースノート\n\n"
             f"リリース日: {_RELEASE_DATE}\nチャンネル: Stable（安定版）\n\n"
-            f"修正（v{_VERSION}）:\n"
-            "- Windows 署名検証を自己署名証明書に対応（v1.12.4〜v1.12.6 で署名パイプラインを実地検証）\n\n"
+            f"改善（v{_VERSION}）:\n"
+            "- リリース工程の署名検証を自己署名証明書に対応（アプリの機能変更なし。v1.12.4〜v1.12.6 で署名パイプラインを実地検証）\n\n"
             "v1.12 の主な追加:\n"
             "- 自動更新: 署名付き更新パッケージ。診断ダイアログから「更新を確認」「ダウンロードして適用」\n"
             "- コード署名: Windows インストーラーに Authenticode 署名（現行は自己署名）\n\n"

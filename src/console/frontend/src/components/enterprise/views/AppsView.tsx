@@ -86,7 +86,7 @@ const TOGGLES: ToggleItem[] = [
   {
     id: "forceMin",
     label: "最低バージョン強制",
-    sub: "最低サポート版（ビルド情報で確認）未満はアクセスをブロック",
+    sub: "最低サポート版（ビルド情報で確認）未満をブロック（表示のみ・未実装）",
   },
   {
     id: "telemetry",

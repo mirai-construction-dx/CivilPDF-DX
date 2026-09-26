@@ -190,8 +190,7 @@ const MOCK_APPS_RELEASE_NOTES = {
       version: _APP_VER,
       channel: "stable",
       release_date: "2026-08-12",
-      summary:
-        "v1.12.6 安定版 — Windows コード署名の検証を自己署名に対応（mock）",
+      summary: "v1.12.6 安定版 — Windows コード署名付きリリース（mock）",
       items: [
         {
           type: "FEAT",

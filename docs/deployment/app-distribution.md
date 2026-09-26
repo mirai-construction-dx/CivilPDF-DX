@@ -113,15 +113,15 @@ https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/editor-v1
 
 ## 📌 4. Windows 展開（社内 IT 向け）
 
-| 項目              | 内容                                                                                                                                     |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 🧩 前提ランタイム | WebView2（Windows 11 は標準搭載。Windows 10 は未導入端末のみ Evergreen を事前配布）                                                      |
-| 🤫 サイレント導入 | `msiexec /i CivilPDF.Editor_1.12.6_x64_ja-JP.msi /qn /norestart`                                                                         |
-| 🗑️ サイレント削除 | `msiexec /x {ProductCode} /qn /norestart`                                                                                                |
-| 🔁 対話型導入     | `CivilPDF.Editor_1.12.6_x64-setup.exe`（個人 PC 向け）                                                                                   |
-| 🔍 検出条件       | Uninstall レジストリの DisplayName（`CivilPDF Editor`）/ DisplayVersion（`1.12.6`）                                                      |
-| 🏢 Intune         | `.msi` を Win32 アプリ（IntuneWinAppUtil でラップ）または LOB アプリとして登録                                                           |
-| 🔏 署名           | Authenticode 署名済み（**自己署名**）。SmartScreen 警告は、証明書を社内信頼ストアへ GPO/Intune 配布するか OV/EV 証明書へ切り替えると解消 |
+| 項目              | 内容                                                                                                                                                                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🧩 前提ランタイム | WebView2（Windows 11 は標準搭載。Windows 10 は未導入端末のみ Evergreen を事前配布）                                                                                                                                                                                                                                             |
+| 🤫 サイレント導入 | `msiexec /i CivilPDF.Editor_1.12.6_x64_ja-JP.msi /qn /norestart`                                                                                                                                                                                                                                                                |
+| 🗑️ サイレント削除 | `msiexec /x {ProductCode} /qn /norestart`                                                                                                                                                                                                                                                                                       |
+| 🔁 対話型導入     | `CivilPDF.Editor_1.12.6_x64-setup.exe`（個人 PC 向け）                                                                                                                                                                                                                                                                          |
+| 🔍 検出条件       | Uninstall レジストリの DisplayName（`CivilPDF Editor`）/ DisplayVersion（`1.12.6`）                                                                                                                                                                                                                                             |
+| 🏢 Intune         | `.msi` を Win32 アプリ（IntuneWinAppUtil でラップ）または LOB アプリとして登録                                                                                                                                                                                                                                                  |
+| 🔏 署名           | Authenticode 署名済み（**自己署名**）。証明書を GPO/Intune で **信頼された発行元（Trusted Publishers）** ストアへ配布すると「発行元不明」警告を軽減できる（ルートへの全社配布は鍵漏えい時の影響が大きいので避け、署名鍵は厳重に保護する）。ダウンロードファイルの SmartScreen 評判判定は残る場合があり、恒久対策は OV/EV 証明書 |
 
 > 🔐 配布前に §3 の SHA-256 と `APPS_SHA256_*` の一致を確認してから展開してください。
 

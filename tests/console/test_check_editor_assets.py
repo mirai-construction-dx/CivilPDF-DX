@@ -75,6 +75,62 @@ def test_sha256_verified_when_configured(script, monkeypatch, capsys):
     assert "[FAIL] win-msi" in out and "sha256 mismatch" in out
 
 
+def test_get_error_during_sha256_is_reported_not_raised(script, monkeypatch, capsys):
+    monkeypatch.setenv("APPS_SHA256_WIN_EXE", "0" * 64)
+
+    def handler(request):
+        if request.method == "GET":
+            raise httpx.ReadTimeout("slow", request=request)
+        return httpx.Response(200)
+
+    assert script.run(_BASE, _client(handler), verify_sha256=True) == 1
+    assert "[FAIL] win-exe" in capsys.readouterr().out
+
+
+def test_get_non_200_is_not_a_checksum_mismatch(script, monkeypatch, capsys):
+    monkeypatch.setenv("APPS_SHA256_WIN_EXE", "0" * 64)
+
+    def handler(request):
+        return httpx.Response(200 if request.method == "HEAD" else 403)
+
+    assert script.run(_BASE, _client(handler), verify_sha256=True) == 1
+    out = capsys.readouterr().out
+    assert "GET HTTP 403" in out and "sha256 mismatch" not in out
+
+
+def test_unconfigured_sha256_is_flagged_in_pass_line(script, monkeypatch, capsys):
+    monkeypatch.delenv("APPS_SHA256_WIN_EXE", raising=False)
+    monkeypatch.delenv("APPS_SHA256_WIN_MSI", raising=False)
+    assert script.run(_BASE, _client(lambda r: httpx.Response(200)), True) == 0
+    assert capsys.readouterr().out.count("(sha256 not configured)") == 2
+
+
+def test_redirect_to_asset_cdn_is_followed(script):
+    def handler(request):
+        if request.url.host == "example.test":
+            return httpx.Response(302, headers={"location": "https://cdn.test/a"})
+        return httpx.Response(200)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    assert script.run(_BASE, client) == 0
+
+
+def test_main_strips_trailing_slash_and_checks(script, monkeypatch):
+    calls = []
+
+    def fake_run(base_url, client, verify_sha256=False):
+        calls.append(base_url)
+        return 0
+
+    monkeypatch.setattr(script, "run", fake_run)
+    assert script.main(["--base-url", _BASE + "/"]) == 0
+    assert calls == [_BASE]
+
+
+def test_non_https_base_url_rejected(script):
+    assert script.main(["--base-url", "http://example.test/x"]) == 1
+
+
 def test_unset_base_url_skips(script, monkeypatch):
     monkeypatch.delenv("APPS_RELEASE_BASE_URL", raising=False)
-    assert script.main([]) == 2
+    assert script.main([]) == 3
