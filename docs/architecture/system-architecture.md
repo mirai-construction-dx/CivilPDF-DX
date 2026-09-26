@@ -26,7 +26,7 @@ flowchart TB
 
     subgraph external["外部サービス"]
         CLAUDE["Claude API\nAI検索・要約・OCR補正"]
-        ENTRA["Entra ID (AAD)\nOIDC SSO\n(将来実装)"]
+        ENTRA["Entra ID (AAD)\nOIDC / M365 SSO\n(実装済み)"]
         HENNGE["HENNGE ONE\nSAML / OIDC\n(将来実装)"]
     end
 
@@ -57,7 +57,7 @@ flowchart TB
 | 責務       | PDF 閲覧・注釈・OCR・図面比較・電子印鑑・電子納品チェック・AI検索  |
 | オフライン | ローカルキャッシュによるオフライン動作対応（同期パネルで競合解決） |
 | 通信       | Backend API へ REST/HTTPS で接続                                   |
-| 認証       | JWT Bearer トークン（将来: Entra ID OIDC PKCE）                    |
+| 認証       | JWT Bearer トークン＋Entra ID（M365 ログイン `/auth/m365/login`・OIDC）|
 | 実装状況   | 計画中（MVP フェーズ外）                                           |
 
 ### 2.2 管理コンソール（WebUI）
@@ -130,13 +130,15 @@ flowchart TB
 | 構造 | `uploads/{project_id}/{uuid}.pdf`                                         |
 | 制限 | PDF のみ (`application/pdf`)、最大サイズ `settings.max_file_size_mb` MB   |
 
-### 2.6 AI / Claude API（将来実装）
+### 2.6 AI / Claude API（実装済み）
 
-| 項目     | 内容                                                                |
-| -------- | ------------------------------------------------------------------- |
-| 用途     | OCR テキスト補正、自然言語検索、文書要約、Q&A、電子納品チェック支援 |
-| 実装予定 | 非同期ワーカー経由で呼び出し（Celery / ARQ）                        |
-| SDK      | Anthropic Python SDK                                                |
+| 項目       | 内容                                                                                          |
+| ---------- | --------------------------------------------------------------------------------------------- |
+| 用途       | 文書の分類・構造化抽出・要約（`/api/v1/ai/*`）、セマンティック検索のクエリ拡張                |
+| 呼び出し   | API リクエスト内で同期的に呼ぶ（非同期ワーカーは未導入）                                      |
+| 停止スイッチ | 管理者が `/api/v1/ai-config` で有効化したときだけ呼ぶ（既定は無効・fail closed）             |
+| キー       | DB に Fernet 暗号化で保存（`/api/v1/ai-config`）。なければ環境変数 `ANTHROPIC_API_KEY`        |
+| SDK        | Anthropic Python SDK                                                                          |
 
 ---
 
@@ -175,7 +177,7 @@ sequenceDiagram
     API-->>WebUI: 新しい {access_token, refresh_token}
 ```
 
-### 3.2 将来の Entra ID OIDC 認証
+### 3.2 Entra ID OIDC 認証（実装済み・下図は想定フロー）
 
 ```mermaid
 sequenceDiagram
@@ -338,5 +340,5 @@ Namespace: civilpdf-dx
 | `UPLOAD_DIR`                  | PDF 保存ディレクトリ             | `/app/uploads`                            |
 | `MAX_FILE_SIZE_MB`            | PDF 最大サイズ                   | `100`                                     |
 | `CORS_ORIGINS`                | CORS 許可オリジン                | `https://console.example.com`             |
-| `CLAUDE_API_KEY`              | Claude API キー（将来）          | `sk-ant-...`                              |
+| `ANTHROPIC_API_KEY`           | Claude API キー（任意・DB 設定がない場合に使用） | `sk-ant-...`                   |
 | `AZURE_CLIENT_ID`             | Entra ID クライアント ID（将来） | `xxxxxxxx-...`                            |
