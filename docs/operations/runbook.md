@@ -210,7 +210,7 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - 外部アラートはメール（msmtp/Gmail）のみ。Slack/Teams 等へ拡張する場合は `scripts/alert-notify.sh` を拡張
 - 復元訓練は四半期 timer で自動化済み。訓練ログは `~/.local/state/civildx-drill/drill.log`
 - バージョン: リポジトリ `VERSION` は 0.10.0。`scripts/verify-version-sync.sh` は CI で毎 PR 実行され、
-  `docs/operations/runbook.md` の「現在 0.10.0」表記を含めて同期を検証する。git タグ `v0.9.0`（2026-08-13 時点に後付け）と `v0.10.0` を付与済み
+  `docs/operations/runbook.md` の「現在 0.10.0」表記を含めて同期を検証する。git タグは #155 のマージ後に `v0.9.0`（2026-08-13 の #132 に後付け）と `v0.10.0` を付与する
 - CI 強化（2026-08-12）: `gitleaks`（secret scan）・`npm audit`・スクリプト構文/バージョン整合チェックを追加
 - GitHub 保護: ruleset `central-auto-merge`（2026-08-15 作成）が有効で、
   12 個の必須ステータスチェック通過 + squash merge のみ + force push 禁止。

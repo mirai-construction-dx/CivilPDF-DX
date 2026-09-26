@@ -2,7 +2,7 @@
 
 > ✅ 2026-09-26 ユーザーが **案 A** を承認。VERSION 0.10.0 は release PR で、タグ `v0.9.0`（`a73b90b`）・`v0.10.0` と GitHub Release はマージ後に作成する。
 
-## 🔍 現状
+## 🔍 現状（計画作成時点・2026-09-26 午前の記録）
 
 | 項目                      | 状態                                                                                                                                                                                                 |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -29,13 +29,18 @@
 | B             | 現在の main で `v0.9.0` をタグ（`VERSION` は変えない）                                                          | 作業が最小                                         | `v0.9.0` の中身が 8/13 の公開時点と一致しない                                |
 | C             | 本番反映が終わってからまとめて `v0.10.0`                                                                        | 本番で動いているものとタグが一致する               | 反映までタグがないまま                                                       |
 
-## ✅ 案 A の手順（承認後）
+## ✅ 案 A の手順（承認済み）
 
-1. PR: `VERSION` を `0.10.0` に、`APP_VERSION`（`.env.example` / `.env.prod.example` / `deploy/civilpdf.env.example`）と runbook の表記を更新（`verify-version-sync.sh` で整合を確認）。あわせて**同期されていない版表記**を直す: UI のバッジ `EnterpriseLayout.tsx` の `v0.4.2 · Enterprise`（固定値）、`src/console/backend/.env.example` の `APP_VERSION=0.1.0`。`frontend/package.json` の `0.0.0`（private パッケージ）は対象外と明記する。`verify-version-sync.sh` にも UI バッジの検査を加えると再発を防げる
-2. PR: CHANGELOG の `[Unreleased]` を `## [0.10.0] — <日付>` と `## [0.9.0] — 2026-08-13` に分ける（#132 以前と以後で区切る）。0.8.0（#121・2026-08-12）は 1 日だけでタグもないため、**`[0.9.0]` に統合し、その旨を節の冒頭に書く**。`[0.10.0]` には **BREAKING** 節（ダウンロード ID の廃止・トグル撤去・本番 DB の移行）を設ける
-3. マージ後、`git tag -a v0.9.0 a73b90b` と `git tag -a v0.10.0 <merge commit>` を作って push する
-4. GitHub Release を 2 件作る（`v0.10.0` を Latest にする。`editor-v*` とは別系統）。`v0.10.0` の本文にも BREAKING 節を載せる
-5. 本番反映は、[反映チェックリスト](../deploy/20260926-editor-distribution-rollout.md)に従って人間が行う。`.env` の `APP_VERSION` も `0.10.0` にする
+1. PR #155: `VERSION` を `0.10.0` に。`APP_VERSION`（env 例 4 か所・MVP の compose と unit）、`config.py` の既定値、runbook を更新（`verify-version-sync.sh` で整合を確認）。UI バッジは `/health` の実行中の版を表示
+2. PR #155: CHANGELOG を `[0.10.0]`（BREAKING とアップグレード時の注意）と `[0.9.0]`（0.8.0 を統合）に分ける
+3. マージ後にタグを作って push する（ruleset がタグを制限していないか、push の結果で確認する）:
+   ```bash
+   git tag -a v0.9.0 a73b90b -m "v0.9.0 — MVP/Prototype 公開（2026-08-13・後付けタグ）"
+   git tag -a v0.10.0 <#155 の merge commit> -m "v0.10.0"
+   git push origin v0.9.0 v0.10.0
+   ```
+4. GitHub Release は **`v0.9.0` → `v0.10.0` の順**に作る。`v0.9.0` は `--latest=false`（後付けと明記）、`v0.10.0` を `--latest`（本文に BREAKING とアップグレード時の注意）。`editor-v*` とは別系統
+5. 本番反映は人間が行う（[反映チェックリスト](../deploy/20260926-editor-distribution-rollout.md)）。`.env` の `APP_VERSION` を `0.10.0` にしてから再ビルドする（`pre-deploy-check.sh` が不一致を FAIL にする）
 
 ## ❓ 判断してほしいこと
 

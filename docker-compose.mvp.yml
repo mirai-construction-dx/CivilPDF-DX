@@ -29,7 +29,7 @@ services:
       SECRET_KEY: mvp-demo-secret-key-32bytes-minimum
       TIMESTAMP_HMAC_KEY: mvp-demo-hmac-key-32bytes-minimum
       DEBUG: "false"
-      APP_VERSION: 0.9.0
+      APP_VERSION: 0.10.0
       CORS_ORIGINS: '["http://localhost:5183","http://127.0.0.1:5183"]'
       PYTHONPATH: /app
     volumes:

@@ -56,6 +56,11 @@ export default defineConfig(({ command }) => {
           target: apiTarget,
           changeOrigin: true,
         },
+        // Liveness probe; the UI badge reads the running version from it.
+        "/health": {
+          target: apiTarget,
+          changeOrigin: true,
+        },
       },
     },
     preview: {
@@ -68,6 +73,11 @@ export default defineConfig(({ command }) => {
       ],
       proxy: {
         "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+        },
+        // Liveness probe; the UI badge reads the running version from it.
+        "/health": {
           target: apiTarget,
           changeOrigin: true,
         },
