@@ -131,6 +131,29 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - 失敗時はアラートメール送信＋`~/.local/state/civildx-drill/drill.log` に記録
 - 手動実行: `./scripts/restore-drill.sh`
 
+## 4.3 PDF Editor 配布リンク監視と新版の配布
+
+- **日次監視**: `scripts/monitor-civilpdf.sh`（5 分毎）が、ヘルスチェックの後（EXIT trap）に `scripts/editor-asset-watch.sh` を呼び、
+  `CIVILPDF_ASSET_CHECK_INTERVAL`（既定 1440 分＝1 日）に 1 回だけ `scripts/check-editor-assets.py` を実行する（ヘルス監視の終了コードには影響しない）
+  - 検査対象は**稼働中の backend コンテナ**（`CIVILPDF_BACKEND_CONTAINER`、既定 `civilpdf-dx-backend-1`）から取る: `APPS_RELEASE_BASE_URL` と、そのイメージの `apps.py` が配っているファイル名。作業ツリーが別ブランチでも、本番の実態を検査する
+  - URL が空、またはコンテナが作り直し中で読めない場合はスキップし、`CIVILPDF_ASSET_RETRY_INTERVAL`（既定 60 分）後に再試行する
+  - アセットに届かなければ「PDF Editor 配布リンク異常」、検査スクリプト自体が失敗したら「配布リンク検査の実行失敗」を 1 回メール通知する。メール送信に失敗した場合は通知済みにせず再送する。復旧時にも 1 回通知する
+  - 手動実行: `./scripts/editor-asset-watch.sh --force`（ログは `~/.local/state/civildx-monitor/monitor.log`）
+  - ⚠️ `APPS_RELEASE_BASE_URL` とイメージの版は**同時に**更新すること（env だけ新しいタグにすると、旧イメージのファイル名で 404 と判定されて通知が出る）
+- **新版の配布手順**（詳細は [app-distribution.md](../deployment/app-distribution.md) §3）
+  1. Editor の Windows インストーラー（`.exe` / `.msi`）を取得し、Editor の更新署名鍵（minisign）で署名を検証する
+  2. `gh release create editor-v<版> -R mirai-construction-dx/CivilPDF-DX --latest=false ...` で公開する
+  3. `apps.py` の `_VERSION` などを PR で更新してマージする
+  4. `APPS_RELEASE_BASE_URL`・`APPS_SHA256_WIN_EXE` / `APPS_SHA256_WIN_MSI` を更新し、compose を再ビルドする
+  5. SHA-256 まで確認する（ホストのシェルには本番 env がないので、値を明示して実行する）:
+     ```bash
+     APPS_SHA256_WIN_EXE=<sha> APPS_SHA256_WIN_MSI=<sha> \
+       python scripts/check-editor-assets.py --verify-sha256 --base-url <APPS_RELEASE_BASE_URL>
+     ```
+     `(sha256 not configured)` と表示された行は、到達性しか確認できていない
+- **ロールバック**: `APPS_RELEASE_BASE_URL` を前の版のタグに戻す（または空にして「近日公開予定」表示にする）
+- **注意**: monitor の systemd unit は、この作業ツリー（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）のスクリプトを直接実行している（2026-09-26 確認）。作業が終わったら main を checkout した状態に戻すこと（§8 の共有 checkout の制約を参照）
+
 ## 5. ロールバック
 
 1. アプリロールバック: 直前リリースの commit を checkout → frontend 再ビルド → backend/frontend 再起動

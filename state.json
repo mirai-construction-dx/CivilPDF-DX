@@ -385,11 +385,11 @@
     "[必須/人間作業] Linux サーバーで docker compose -f docker-compose.prod.yml up -d --build を実行（PR #36 マージ済み 2026-06-06）",
     "[必須/人間作業] 初回管理者ユーザー作成・デフォルトパスワード変更（docs/deployment/docker-production-deployment.md §5 参照）",
     "[必須/人間作業] Windows 11 展開当日は docs/deployment/windows11-precheck-network-m365.md を参照して作業",
-    "[P3] dev 依存脆弱性（esbuild<=0.24.2 経由 vite/vitest）解消 — vite/vitest メジャー更新の影響評価込みで別 Issue 化",
-    "[P3] test_workflows.py fixture isolation 修正（ローカル SQLite UNIQUE constraint 5件 — CI は green・pre-existing PR #8）",
     "[保留/macOS] PDF Editor の macOS 配布は後日対応（ペンディング, 2026-09-26 決定）。再開時: Developer ID 署名・notarization・.dmg/.pkg 要否を確認し apps.py の _PENDING_PLATFORMS から _build_packages へ戻す",
     "[P3] AppsView 配布設定トグル（自動アップデート/最低バージョン強制/テレメトリー）は UI 表示のみ — 永続化 API は未実装（別 Issue 候補）",
-    "[要実施/公開] Release editor-v1.12.6（Windows .exe/.msi）を mirai-construction-dx/CivilPDF-DX に --latest=false で作成し、本番 APPS_RELEASE_BASE_URL を差し替え → scripts/check-editor-assets.py で PASS 確認"
+    "[人間作業] 本番 env に APPS_RELEASE_BASE_URL（editor-v1.12.6）と APPS_SHA256_WIN_EXE/MSI を設定し compose 再ビルド（Release は 2026-09-26 公開・検証済み）",
+    "[要確認] fix/production-reliability-hardening-20260918（未 push・#136 取り込み済み推定）の差分確認後に削除",
+    "[人間作業] GitHub PAT に Workflows: Read and write を付与 → ci.yml に ruff check tests/ scripts/ を追加する PR"
   ],
   "learning": {
     "failure_patterns": [

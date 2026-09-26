@@ -239,6 +239,30 @@ describe("AppsView", () => {
     expect(body).not.toContain("v1.2.4");
   });
 
+  it("opens card modals only on Enter/Space from the keyboard", async () => {
+    const user = userEvent.setup();
+    const props = renderView();
+    const card = (await screen.findByText("安定版")).closest(
+      '[role="button"]',
+    ) as HTMLElement;
+    card.focus();
+    await user.keyboard("a");
+    expect(props.onShowModal).not.toHaveBeenCalled();
+    await user.keyboard(" ");
+    expect(props.onShowModal).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Stable チャンネル" }),
+    );
+  });
+
+  it("shows a read-only distribution policy instead of ineffective toggles", async () => {
+    renderView();
+    const panel = await screen.findByTestId("distribution-policy");
+    expect(panel).toHaveTextContent("配布ポリシー");
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByText("配布設定")).toBeNull();
+    expect(screen.queryByText("テレメトリー収集")).toBeNull();
+  });
+
   it("marks deploy targets and KPI as demo data", async () => {
     renderView();
     await waitFor(() => {

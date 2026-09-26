@@ -47,6 +47,14 @@ describe("LandingView", () => {
     expect(props.onNavigate).toHaveBeenCalledWith("upload");
   });
 
+  it("shows capabilities instead of unmeasured usage numbers", () => {
+    renderView();
+    for (const fake of ["1,284", "248", "97.3%", "アクティブユーザー"]) {
+      expect(screen.queryByText(fake)).toBeNull();
+    }
+    expect(screen.getByText("改ざん検知付き監査ログ")).toBeInTheDocument();
+  });
+
   it("renders the feature pillars", () => {
     renderView();
     expect(screen.getByText("PDF業務基盤")).toBeInTheDocument();

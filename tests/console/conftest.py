@@ -31,7 +31,10 @@ from auth.jwt import get_password_hash
 from middleware.rate_limit import reset_all
 from models.user import User, UserRole, UserStatus
 
-SQLALCHEMY_TEST_URL = "sqlite:///./test_console.db"
+# One SQLite file per pytest process: a shared ./test_console.db let two concurrent
+# runs (e.g. a stale background run) drop each other's tables mid-test.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="civilpdf-test-db-")
+SQLALCHEMY_TEST_URL = f"sqlite:///{_TEST_DB_DIR}/test_console.db"
 
 engine_test = create_engine(
     SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False}
@@ -41,9 +44,11 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_isolated_upload_dir():
-    """Remove the throwaway upload directory once the session ends."""
+    """Remove the throwaway upload and DB directories once the session ends."""
     yield
     shutil.rmtree(os.environ.get("UPLOAD_DIR", ""), ignore_errors=True)
+    engine_test.dispose()
+    shutil.rmtree(_TEST_DB_DIR, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

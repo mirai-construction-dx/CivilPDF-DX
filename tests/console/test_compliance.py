@@ -10,14 +10,11 @@ Covers:
 
 import base64
 import hashlib
-import hmac
 import json
 import os
 
-import pytest
-from models.document import Document, DocumentStatus, DocumentType
+from models.document import Document, DocumentType
 from models.retention_policy import DEFAULT_POLICIES, RetentionPolicy
-from models.user import User, UserRole, UserStatus
 from services import timestamp_service
 from services.audit_chain_service import (
     GENESIS_HASH,
@@ -110,7 +107,6 @@ class TestRetentionService:
 
     def test_apply_retention_sets_expiry(self, db_session, admin_user):
         seed_default_policies(db_session)
-        from datetime import datetime, timezone
 
         doc = Document(
             title="test",
