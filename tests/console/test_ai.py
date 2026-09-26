@@ -10,6 +10,18 @@ from fastapi.testclient import TestClient
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _ai_enabled(db_session):
+    """These tests exercise AI behaviour, so the admin kill switch is on.
+
+    The switch itself (default off, fail closed) is covered in
+    test_ai_kill_switch.py.
+    """
+    from services import ai_settings as ai_settings_service
+
+    ai_settings_service.update_ai_setting(db_session, enabled=True)
+
+
 @pytest.fixture
 def auth_headers(client: TestClient, admin_user):
     """Return Authorization headers for the admin user."""
