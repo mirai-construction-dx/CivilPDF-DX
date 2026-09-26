@@ -1,11 +1,16 @@
 """App distribution API — release channel, release notes, build info and installer downloads.
 
-Source of truth: the public GitHub Release of CivilPDF-Editor (Tauri v2 desktop app).
+Source of truth for the distributed installers: the public GitHub Release of this
+repository (CivilPDF-DX) under the Editor-specific tag `editor-v<version>`, kept
+separate from the console's own `v0.x` release tags.
 
-    https://github.com/Kensan196948G/CivilPDF-Editor/releases/tag/v1.2.4
+    https://github.com/mirai-construction-dx/CivilPDF-DX/releases/tag/editor-v1.12.6
+
+The Editor itself (Tauri v2 desktop app) is built in the CivilPDF-Editor repository;
+version, asset names and notes here mirror its v1.12.6 release.
 
 Distribution scope: Windows only. macOS is deferred (pending, reported via
-`pending_platforms`); Linux assets exist on the Release but are not distributed.
+`pending_platforms`); Linux builds exist upstream but are not distributed.
 
 This module intentionally avoids fabricated metadata. Values that are not measured
 (e.g. active user counts) are reported honestly (0 / None) rather than guessed.
@@ -22,10 +27,10 @@ from models.user import User
 
 router = APIRouter(prefix="/apps", tags=["App Distribution"])
 
-# Current published stable release. Matches the GitHub Release tag v1.2.4.
-_VERSION = "1.2.4"
-# Public release date of v1.2.4 (GitHub Release publication date).
-_RELEASE_DATE = "2026-06-22"
+# Current distributed stable release (CivilPDF-Editor v1.12.6).
+_VERSION = "1.12.6"
+# Upstream release date of v1.12.6 (updater latest.json pub_date).
+_RELEASE_DATE = "2026-08-12"
 
 Channel = Literal["stable"]
 NoteType = Literal["FEAT", "FIX", "SEC", "IMP", "NOTE"]
@@ -37,7 +42,7 @@ def _base_url() -> str:
     """Base URL of the GitHub Releases asset path (empty when unconfigured).
 
     Set in deployment to:
-        https://github.com/Kensan196948G/CivilPDF-Editor/releases/download/v1.2.4
+        https://github.com/mirai-construction-dx/CivilPDF-DX/releases/download/editor-v1.12.6
     """
     return os.getenv("APPS_RELEASE_BASE_URL", "").rstrip("/")
 
@@ -145,10 +150,10 @@ def _pkg(
 def _build_packages() -> list[ReleasePackage]:
     """Build the package list fresh so env-driven checksums/availability stay current.
 
-    Filenames MUST match the real assets attached to the GitHub Release
-    (GitHub replaces spaces in asset names with dots). Asset filenames embed the
-    release version because package.json / tauri.conf.json are bumped before the
-    CI build, so filenames are derived from _VERSION here to prevent drift.
+    Filenames MUST match the real Tauri build assets (GitHub replaces spaces in
+    asset names with dots; the MSI is built with WiX language ja-JP). Asset
+    filenames embed the release version, so they are derived from _VERSION here
+    to prevent drift.
     The download URL is then `{APPS_RELEASE_BASE_URL}/{filename}`.
 
     Only Windows packages are distributed; macOS is listed in _PENDING_PLATFORMS.
@@ -160,15 +165,15 @@ def _build_packages() -> list[ReleasePackage]:
             "exe",
             "インストーラー (.exe / NSIS)",
             f"CivilPDF.Editor_{_VERSION}_x64-setup.exe",
-            "約 1.9 MB",
+            "約 39.3 MB",
         ),
         _pkg(
             "win-msi",
             "windows",
             "msi",
             "インストーラー (.msi)",
-            f"CivilPDF.Editor_{_VERSION}_x64_en-US.msi",
-            "約 2.4 MB",
+            f"CivilPDF.Editor_{_VERSION}_x64_ja-JP.msi",
+            "約 40.1 MB",
         ),
     ]
 
@@ -192,11 +197,10 @@ _CHANNELS: list[ChannelInfo] = [
         version=f"v{_VERSION}",
         release_date=_RELEASE_DATE,
         description=(
-            "安定版。テキスト編集モード（v1.2.4 新機能）・注釈（Phase A）・"
-            "検索/しおり/透かし/メタデータ（Phase B）・"
-            "画像→PDF/比較/フォーム（Phase C）を搭載。"
+            "安定版。PDF 表示・電子印鑑・OCR・大判図面・注釈・レビュー台帳に加え、"
+            "自動更新（署名付き）・複数 PDF 一括処理・印影ライブラリ・自動保存を搭載。"
             "Windows 版のみ提供（macOS は後日対応）。"
-            "未署名ビルドのため Windows SmartScreen の警告が表示される場合があります。"
+            "自己署名のコード署名のため Windows SmartScreen の警告が表示される場合があります。"
         ),
         user_count=0,
     ),
@@ -208,78 +212,50 @@ _RELEASE_NOTES: list[ReleaseNote] = [
         version=_VERSION,
         channel="stable",
         release_date=_RELEASE_DATE,
-        summary="v1.2.4 安定版 — テキスト編集の左右の位置ずれを修正（v1.2.0 の全機能を継続搭載）",
+        summary=(
+            f"v{_VERSION} 安定版 — Windows コード署名の検証を自己署名に対応"
+            "（v1.3〜v1.12 の機能を継続搭載）"
+        ),
         items=[
             ReleaseNoteItem(
                 type="FIX",
-                text="テキスト編集の置換テキストが画面で左にずれる不具合を修正（左右の位置を元の文字に一致）",
+                text="Windows 署名検証を自己署名証明書に対応（署名の存在・改ざんなし・署名者の一致で判定）",
             ),
             ReleaseNoteItem(
-                type="FIX",
-                text="テキスト編集の置換テキストが元のベースラインに正確に配置されるよう修正（上下のずれを解消）",
-            ),
-            ReleaseNoteItem(
-                type="FIX",
-                text="テキスト編集の確定後に画面へ即時反映されるよう修正（確定した編集が画面に表示されなかった不具合）",
-            ),
-            ReleaseNoteItem(
-                type="FIX",
-                text="テキスト編集モードの日本語対応（NotoSansJP 同梱で日本語が PDF に焼き込まれるように）",
+                type="SEC",
+                text="Windows インストーラーに Authenticode コード署名を付与（現行は自己署名）",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="テキスト編集モード（PDF 上のテキストを直接編集・PDF 焼き込み）",
+                text="自動更新（署名付き更新パッケージ・診断ダイアログから「更新を確認」）",
             ),
-            ReleaseNoteItem(type="FEAT", text="PDF 表示（M1: ページ閲覧・ズーム）"),
             ReleaseNoteItem(
-                type="FEAT",
-                text="電子印鑑（M2: 印影作成・配置・PDF 埋め込み）",
-            ),
-            ReleaseNoteItem(type="FEAT", text="OCR テキスト抽出（M3: Tesseract.js）"),
-            ReleaseNoteItem(type="FEAT", text="大判図面対応（M4: A0/A1 タイル表示）"),
-            ReleaseNoteItem(
-                type="FEAT",
-                text="注釈（Phase A: ハイライト・下線・取消線・付箋・手書き・消去 + 6色カラーピッカー）",
+                type="SEC",
+                text="暗号化処理の任意パス読み取り防止・DX オフラインキューの上限設定",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="テキスト検索（Phase B: 全ページ横断・前後ナビ・コンテキスト表示）",
+                text="診断ログ（オプトイン・端末内保存・外部送信なし）",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="しおり/目次ナビゲーション（Phase B: PDF アウトライン階層表示）",
+                text="複数 PDF 一括処理（回転・透かし・ヘッダー/フッター・パスワード保護）",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="透かし追加（Phase B: CJK 対応テキスト透かし）",
+                text="印影ライブラリ・自動保存とクラッシュ復元・検索→置換",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="メタデータ編集（Phase B: タイトル・著者・件名・キーワード）",
+                text="レビュー台帳の CSV 出力・比較結果の PDF レポート・DX 同期のオフラインキュー",
             ),
             ReleaseNoteItem(
                 type="FEAT",
-                text="画像から PDF 作成（Phase C: PNG/JPEG → PDF A4/A3 対応）",
-            ),
-            ReleaseNoteItem(
-                type="FEAT",
-                text="PDF 比較（Phase C: LCS アルゴリズムによるテキスト差分表示）",
-            ),
-            ReleaseNoteItem(
-                type="FEAT",
-                text="フォームフィールド確認（Phase C: AcroForm Widget 読み取り）",
-            ),
-            ReleaseNoteItem(
-                type="FEAT",
-                text="ネイティブメニュー（File/Edit/View・キーボードショートカット対応）",
-            ),
-            ReleaseNoteItem(
-                type="FEAT",
-                text="レビューワークフロー（承認・却下スタンプ・非破壊保存）",
+                text="継続: PDF 表示・電子印鑑・OCR・大判図面・注釈・テキスト編集・検索/しおり/透かし・比較・フォーム",
             ),
             ReleaseNoteItem(
                 type="NOTE",
-                text="未署名ビルド。Windows SmartScreen の警告が表示される場合があります",
+                text="自己署名のため Windows SmartScreen の警告が表示される場合があります（社内信頼ストア配布で解消）",
             ),
             ReleaseNoteItem(
                 type="NOTE",
@@ -287,35 +263,22 @@ _RELEASE_NOTES: list[ReleaseNote] = [
             ),
         ],
         highlights=(
-            "v1.2.4 — リリースノート\n\n"
+            f"v{_VERSION} — リリースノート\n\n"
             f"リリース日: {_RELEASE_DATE}\nチャンネル: Stable（安定版）\n\n"
-            "修正（v1.2.4）:\n"
-            "- テキスト編集の左右ずれ: 置換テキストが画面で左にずれる不具合を修正"
-            "（左右の位置を元の文字に一致）\n"
-            "- テキスト編集の上下ずれ: 元のベースラインに正確に配置するよう修正（v1.2.3）\n"
-            "- テキスト編集の画面反映: 確定した編集が画面に即時表示されるよう修正（v1.2.2）\n"
-            "- テキスト編集の日本語対応: NotoSansJP 同梱で日本語が PDF に焼き込まれるよう修正（v1.2.1）\n\n"
-            "v1.2.0 の新機能:\n"
-            "- テキスト編集モード: PDF 上のテキストを直接編集し、PDF へ焼き込み\n\n"
-            "継続機能（v1.1.0 から）:\n"
-            "- 注釈（Phase A）: ハイライト・下線・取消線・付箋・手書き・消去 + 6色カラーピッカー\n"
-            "- テキスト検索（Phase B）: 全ページ横断検索・前後ナビゲーション・コンテキスト表示\n"
-            "- しおり/目次（Phase B）: PDF アウトライン階層表示・クリックでページ移動\n"
-            "- 透かし（Phase B）: CJK 対応テキスト透かし\n"
-            "- メタデータ編集（Phase B）: タイトル・著者・件名・キーワード・作成アプリ\n"
-            "- 画像から PDF 作成（Phase C）: PNG/JPEG → PDF（A4/A3/自動）\n"
-            "- PDF 比較（Phase C）: LCS アルゴリズムによるテキスト差分表示\n"
-            "- フォームフィールド確認（Phase C）: AcroForm Widget フィールド読み取り\n"
-            "- ネイティブメニュー: File/Edit/View メニュー・キーボードショートカット\n\n"
-            "継続機能（v1.0.0 から）:\n"
-            "- PDF 表示（M1）: ページ閲覧・ズーム\n"
-            "- 電子印鑑（M2）: 印影作成・配置・PDF 埋め込み\n"
-            "- OCR（M3）: テキスト抽出（Tesseract.js）\n"
-            "- 大判図面（M4）: A0/A1 タイル表示\n"
-            "- レビューワークフロー: 承認・却下スタンプ・非破壊保存\n\n"
-            "技術スタック: Tauri v2（システムの WebView を利用）\n"
+            f"修正（v{_VERSION}）:\n"
+            "- Windows 署名検証を自己署名証明書に対応（v1.12.4〜v1.12.6 で署名パイプラインを実地検証）\n\n"
+            "v1.12 の主な追加:\n"
+            "- 自動更新: 署名付き更新パッケージ。診断ダイアログから「更新を確認」「ダウンロードして適用」\n"
+            "- コード署名: Windows インストーラーに Authenticode 署名（現行は自己署名）\n\n"
+            "v1.3〜v1.11 の主な追加:\n"
+            "- 複数 PDF 一括処理・印影ライブラリ・自動保存とクラッシュ復元・検索→置換\n"
+            "- レビュー台帳 CSV 出力・比較結果 PDF レポート・DX 同期オフラインキュー\n"
+            "- 診断ログ（オプトイン・外部送信なし）・セキュリティ堅牢化\n\n"
+            "継続機能（v1.0〜v1.2）:\n"
+            "- PDF 表示・電子印鑑・OCR・大判図面・注釈・テキスト編集・検索/しおり/透かし・比較・フォーム\n\n"
+            "技術スタック: Tauri v2（システムの WebView2 を利用）\n"
             "対応 OS: Windows 10 / 11 (64bit)。macOS は後日対応（ペンディング）。\n"
-            "注意: 未署名ビルドのため、Windows SmartScreen の警告が表示される場合があります。"
+            "注意: 自己署名のため、Windows SmartScreen の警告が表示される場合があります。"
         ),
     ),
 ]
