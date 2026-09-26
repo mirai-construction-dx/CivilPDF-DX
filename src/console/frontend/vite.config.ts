@@ -12,7 +12,8 @@ const securityHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), interest-cohort=()",
 };
 
 function securityHeadersPlugin(): Plugin {

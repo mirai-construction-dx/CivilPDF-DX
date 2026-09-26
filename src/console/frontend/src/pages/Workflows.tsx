@@ -1,53 +1,64 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listWorkflows, getWorkflow, decideStep, type WorkflowResponse, type ApprovalStep } from '../api/workflows'
-import { useAuthStore } from '../store/auth'
-import { useModalDialog } from '../hooks/useModalDialog'
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  listWorkflows,
+  getWorkflow,
+  decideStep,
+  type WorkflowResponse,
+  type ApprovalStep,
+} from "../api/workflows";
+import { useAuthStore } from "../store/auth";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 const statusLabel: Record<string, { label: string; cls: string }> = {
-  in_progress: { label: '審査中', cls: 'bg-orange-100 text-orange-700' },
-  approved: { label: '承認済', cls: 'bg-green-100 text-green-700' },
-  rejected: { label: '却下', cls: 'bg-red-100 text-red-700' },
-}
+  in_progress: { label: "審査中", cls: "bg-orange-100 text-orange-700" },
+  approved: { label: "承認済", cls: "bg-green-100 text-green-700" },
+  rejected: { label: "却下", cls: "bg-red-100 text-red-700" },
+};
 
 const stepStatusLabel: Record<string, { label: string; cls: string }> = {
-  pending: { label: '保留中', cls: 'bg-yellow-100 text-yellow-700' },
-  approved: { label: '承認', cls: 'bg-green-100 text-green-700' },
-  rejected: { label: '却下', cls: 'bg-red-100 text-red-700' },
-}
+  pending: { label: "保留中", cls: "bg-yellow-100 text-yellow-700" },
+  approved: { label: "承認", cls: "bg-green-100 text-green-700" },
+  rejected: { label: "却下", cls: "bg-red-100 text-red-700" },
+};
 
 // ---------- WorkflowDetailModal ----------
 
 interface DetailModalProps {
-  workflowId: string
-  onClose: () => void
+  workflowId: string;
+  onClose: () => void;
 }
 
 function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
-  const qc = useQueryClient()
-  const currentUser = useAuthStore((s) => s.user)
-  const dialogRef = useModalDialog(true, onClose)
-  const [comment, setComment] = useState('')
-  const [actingStepId, setActingStepId] = useState<string | null>(null)
+  const qc = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const dialogRef = useModalDialog(true, onClose);
+  const [comment, setComment] = useState("");
+  const [actingStepId, setActingStepId] = useState<string | null>(null);
 
   const { data: wf, isLoading } = useQuery<WorkflowResponse>({
-    queryKey: ['workflow', workflowId],
+    queryKey: ["workflow", workflowId],
     queryFn: () => getWorkflow(workflowId),
-  })
+  });
 
   const decide = useMutation({
-    mutationFn: ({ stepId, decision }: { stepId: string; decision: 'approve' | 'reject' }) =>
-      decideStep(workflowId, stepId, decision, comment || undefined),
+    mutationFn: ({
+      stepId,
+      decision,
+    }: {
+      stepId: string;
+      decision: "approve" | "reject";
+    }) => decideStep(workflowId, stepId, decision, comment || undefined),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['workflow', workflowId] })
-      qc.invalidateQueries({ queryKey: ['workflows'] })
-      setComment('')
-      setActingStepId(null)
+      qc.invalidateQueries({ queryKey: ["workflow", workflowId] });
+      qc.invalidateQueries({ queryKey: ["workflows"] });
+      setComment("");
+      setActingStepId(null);
     },
-  })
+  });
 
   function isMyPendingStep(step: ApprovalStep): boolean {
-    return step.approver_id === currentUser?.id && step.status === 'pending'
+    return step.approver_id === currentUser?.id && step.status === "pending";
   }
 
   return (
@@ -57,12 +68,19 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
       aria-modal="true"
       aria-labelledby="workflow-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 id="workflow-modal-title" className="text-lg font-bold text-gray-800">ワークフロー詳細</h2>
+          <h2
+            id="workflow-modal-title"
+            className="text-lg font-bold text-gray-800"
+          >
+            ワークフロー詳細
+          </h2>
           <button
             onClick={onClose}
             aria-label="閉じる"
@@ -77,34 +95,44 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
           {isLoading ? (
             <p className="text-gray-400 text-sm">読み込み中...</p>
           ) : !wf ? (
-            <p className="text-gray-400 text-sm">ワークフローが見つかりません</p>
+            <p className="text-gray-400 text-sm">
+              ワークフローが見つかりません
+            </p>
           ) : (
             <>
               {/* Status badge */}
               <div className="mb-4 flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusLabel[wf.status]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${statusLabel[wf.status]?.cls ?? "bg-gray-100 text-gray-600"}`}
+                >
                   {statusLabel[wf.status]?.label ?? wf.status}
                 </span>
                 <span className="text-xs text-gray-400">
-                  開始: {new Date(wf.created_at).toLocaleDateString('ja-JP')}
+                  開始: {new Date(wf.created_at).toLocaleDateString("ja-JP")}
                 </span>
                 {wf.completed_at && (
                   <span className="text-xs text-gray-400">
-                    完了: {new Date(wf.completed_at).toLocaleDateString('ja-JP')}
+                    完了:{" "}
+                    {new Date(wf.completed_at).toLocaleDateString("ja-JP")}
                   </span>
                 )}
               </div>
 
               {/* Steps */}
-              <h3 className="text-sm font-semibold text-gray-600 mb-3">承認ステップ</h3>
+              <h3 className="text-sm font-semibold text-gray-600 mb-3">
+                承認ステップ
+              </h3>
               <ol className="space-y-3">
                 {wf.steps
                   .slice()
                   .sort((a, b) => a.order - b.order)
                   .map((step) => {
-                    const ss = stepStatusLabel[step.status] ?? { label: step.status, cls: 'bg-gray-100 text-gray-600' }
-                    const canAct = isMyPendingStep(step) && !decide.isPending
-                    const isExpanded = actingStepId === step.id
+                    const ss = stepStatusLabel[step.status] ?? {
+                      label: step.status,
+                      cls: "bg-gray-100 text-gray-600",
+                    };
+                    const canAct = isMyPendingStep(step) && !decide.isPending;
+                    const isExpanded = actingStepId === step.id;
 
                     return (
                       <li key={step.id} className="border rounded-lg p-3">
@@ -113,18 +141,26 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                             <p className="text-sm font-medium text-gray-800 truncate">
                               {step.order}. {step.approver.full_name}
                             </p>
-                            <p className="text-xs text-gray-400">{step.approver.email}</p>
+                            <p className="text-xs text-gray-400">
+                              {step.approver.email}
+                            </p>
                             {step.comment && (
-                              <p className="text-xs text-gray-500 mt-1 italic">「{step.comment}」</p>
+                              <p className="text-xs text-gray-500 mt-1 italic">
+                                「{step.comment}」
+                              </p>
                             )}
                             {step.decided_at && (
                               <p className="text-xs text-gray-400 mt-0.5">
-                                {new Date(step.decided_at).toLocaleDateString('ja-JP')}
+                                {new Date(step.decided_at).toLocaleDateString(
+                                  "ja-JP",
+                                )}
                               </p>
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
-                            <span className={`px-2 py-0.5 rounded-full text-xs ${ss.cls}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs ${ss.cls}`}
+                            >
                               {ss.label}
                             </span>
                             {canAct && !isExpanded && (
@@ -150,33 +186,48 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                             />
                             <div className="flex gap-2">
                               <button
-                                onClick={() => decide.mutate({ stepId: step.id, decision: 'approve' })}
+                                onClick={() =>
+                                  decide.mutate({
+                                    stepId: step.id,
+                                    decision: "approve",
+                                  })
+                                }
                                 disabled={decide.isPending}
                                 className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-1.5 rounded transition-colors disabled:opacity-50"
                               >
                                 承認
                               </button>
                               <button
-                                onClick={() => decide.mutate({ stepId: step.id, decision: 'reject' })}
+                                onClick={() =>
+                                  decide.mutate({
+                                    stepId: step.id,
+                                    decision: "reject",
+                                  })
+                                }
                                 disabled={decide.isPending}
                                 className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded transition-colors disabled:opacity-50"
                               >
                                 却下
                               </button>
                               <button
-                                onClick={() => { setActingStepId(null); setComment('') }}
+                                onClick={() => {
+                                  setActingStepId(null);
+                                  setComment("");
+                                }}
                                 className="px-3 border text-xs py-1.5 rounded text-gray-600"
                               >
                                 キャンセル
                               </button>
                             </div>
                             {decide.error && (
-                              <p className="text-red-600 text-xs">{String(decide.error)}</p>
+                              <p className="text-red-600 text-xs">
+                                {String(decide.error)}
+                              </p>
                             )}
                           </div>
                         )}
                       </li>
-                    )
+                    );
                   })}
               </ol>
             </>
@@ -184,22 +235,29 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ---------- Workflows (list) ----------
 
 export function Workflows() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { data: workflows = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['workflows'],
+  const {
+    data: workflows = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["workflows"],
     queryFn: listWorkflows,
-  })
+  });
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">承認ワークフロー</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">
+        承認ワークフロー
+      </h1>
 
       {isError && (
         <div
@@ -225,25 +283,51 @@ export function Workflows() {
           <table className="w-full text-sm min-w-[760px]">
             <thead className="border-b">
               <tr className="text-left text-gray-500">
-                <th scope="col" className="px-4 py-3">ドキュメント</th>
-                <th scope="col" className="px-4 py-3">ステータス</th>
-                <th scope="col" className="px-4 py-3">ステップ数</th>
-                <th scope="col" className="px-4 py-3">承認待ち</th>
-                <th scope="col" className="px-4 py-3">作成日</th>
-                <th scope="col" className="px-4 py-3">完了日</th>
+                <th scope="col" className="px-4 py-3">
+                  ドキュメント
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  ステータス
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  ステップ数
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  承認待ち
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  作成日
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  完了日
+                </th>
                 <th scope="col" className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {workflows.map((wf) => {
-                const s = statusLabel[wf.status] ?? { label: wf.status, cls: 'bg-gray-100 text-gray-600' }
+                const s = statusLabel[wf.status] ?? {
+                  label: wf.status,
+                  cls: "bg-gray-100 text-gray-600",
+                };
                 return (
-                  <tr key={wf.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{wf.document_title}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${s.cls}`}>{s.label}</span>
+                  <tr
+                    key={wf.id}
+                    className="border-b last:border-0 hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {wf.document_title}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-center">{wf.step_count}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs ${s.cls}`}
+                      >
+                        {s.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-center">
+                      {wf.step_count}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       {wf.pending_step_count > 0 ? (
                         <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
@@ -254,10 +338,12 @@ export function Workflows() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
-                      {new Date(wf.created_at).toLocaleDateString('ja-JP')}
+                      {new Date(wf.created_at).toLocaleDateString("ja-JP")}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
-                      {wf.completed_at ? new Date(wf.completed_at).toLocaleDateString('ja-JP') : '—'}
+                      {wf.completed_at
+                        ? new Date(wf.completed_at).toLocaleDateString("ja-JP")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -268,7 +354,7 @@ export function Workflows() {
                       </button>
                     </td>
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>
@@ -282,5 +368,5 @@ export function Workflows() {
         />
       )}
     </div>
-  )
+  );
 }

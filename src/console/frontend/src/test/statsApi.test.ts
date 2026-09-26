@@ -78,9 +78,7 @@ const dxSyncStatsData = {
   success_rate_30d: 99.2,
   recent_30d: { total: 125, success: 124, error: 1 },
   by_error_kind_30d: { rbac: 1 },
-  monthly: [
-    { month: "2026-08", success: 124, error: 1 },
-  ],
+  monthly: [{ month: "2026-08", success: 124, error: 1 }],
 };
 
 describe("stats api client", () => {

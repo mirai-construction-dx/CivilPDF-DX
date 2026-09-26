@@ -1,33 +1,39 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { listAuditLogs, downloadAuditLogsCsv } from '../api/auditLogs'
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { listAuditLogs, downloadAuditLogsCsv } from "../api/auditLogs";
 
 const resourceTypeLabel: Record<string, string> = {
-  document: '文書',
-  workflow: 'ワークフロー',
-  user: 'ユーザー',
-  project: 'プロジェクト',
-}
+  document: "文書",
+  workflow: "ワークフロー",
+  user: "ユーザー",
+  project: "プロジェクト",
+};
 
 const actionLabel: Record<string, { label: string; cls: string }> = {
-  'document.upload': { label: 'アップロード', cls: 'bg-blue-100 text-blue-700' },
-  'document.delete': { label: '削除', cls: 'bg-red-100 text-red-700' },
-  'document.update': { label: '更新', cls: 'bg-yellow-100 text-yellow-700' },
-  'workflow.create': { label: 'ワークフロー作成', cls: 'bg-purple-100 text-purple-700' },
-  'workflow.approve': { label: '承認', cls: 'bg-green-100 text-green-700' },
-  'workflow.reject': { label: '却下', cls: 'bg-red-100 text-red-700' },
-  'user.login': { label: 'ログイン', cls: 'bg-gray-100 text-gray-600' },
-  'user.create': { label: 'ユーザー作成', cls: 'bg-blue-100 text-blue-700' },
-}
+  "document.upload": {
+    label: "アップロード",
+    cls: "bg-blue-100 text-blue-700",
+  },
+  "document.delete": { label: "削除", cls: "bg-red-100 text-red-700" },
+  "document.update": { label: "更新", cls: "bg-yellow-100 text-yellow-700" },
+  "workflow.create": {
+    label: "ワークフロー作成",
+    cls: "bg-purple-100 text-purple-700",
+  },
+  "workflow.approve": { label: "承認", cls: "bg-green-100 text-green-700" },
+  "workflow.reject": { label: "却下", cls: "bg-red-100 text-red-700" },
+  "user.login": { label: "ログイン", cls: "bg-gray-100 text-gray-600" },
+  "user.create": { label: "ユーザー作成", cls: "bg-blue-100 text-blue-700" },
+};
 
 export function AuditLogs() {
-  const [page, setPage] = useState(1)
-  const [actionFilter, setActionFilter] = useState('')
-  const [resourceFilter, setResourceFilter] = useState('')
-  const [isExporting, setIsExporting] = useState(false)
+  const [page, setPage] = useState(1);
+  const [actionFilter, setActionFilter] = useState("");
+  const [resourceFilter, setResourceFilter] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['audit-logs', page, actionFilter, resourceFilter],
+    queryKey: ["audit-logs", page, actionFilter, resourceFilter],
     queryFn: () =>
       listAuditLogs({
         page,
@@ -35,10 +41,10 @@ export function AuditLogs() {
         action: actionFilter || undefined,
         resource_type: resourceFilter || undefined,
       }),
-  })
+  });
 
-  const logs = data?.items ?? []
-  const totalPages = data?.pages ?? 0
+  const logs = data?.items ?? [];
+  const totalPages = data?.pages ?? 0;
 
   return (
     <div className="p-8">
@@ -48,7 +54,10 @@ export function AuditLogs() {
         <select
           className="border rounded px-3 py-2 text-sm"
           value={actionFilter}
-          onChange={(e) => { setActionFilter(e.target.value); setPage(1) }}
+          onChange={(e) => {
+            setActionFilter(e.target.value);
+            setPage(1);
+          }}
         >
           <option value="">すべてのアクション</option>
           <option value="document.upload">アップロード</option>
@@ -62,7 +71,10 @@ export function AuditLogs() {
         <select
           className="border rounded px-3 py-2 text-sm"
           value={resourceFilter}
-          onChange={(e) => { setResourceFilter(e.target.value); setPage(1) }}
+          onChange={(e) => {
+            setResourceFilter(e.target.value);
+            setPage(1);
+          }}
         >
           <option value="">すべてのリソース</option>
           <option value="document">文書</option>
@@ -80,17 +92,17 @@ export function AuditLogs() {
           type="button"
           disabled={isExporting}
           onClick={() => {
-            setIsExporting(true)
+            setIsExporting(true);
             downloadAuditLogsCsv({
               action: actionFilter || undefined,
               resource_type: resourceFilter || undefined,
             })
               .catch(() => undefined)
-              .finally(() => setIsExporting(false))
+              .finally(() => setIsExporting(false));
           }}
           className="text-sm px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
-          {isExporting ? '出力中...' : 'CSV出力'}
+          {isExporting ? "出力中..." : "CSV出力"}
         </button>
       </div>
 
@@ -118,43 +130,72 @@ export function AuditLogs() {
           <table className="w-full text-sm min-w-[860px]">
             <thead className="border-b">
               <tr className="text-left text-gray-500">
-                <th scope="col" className="px-4 py-3">日時</th>
-                <th scope="col" className="px-4 py-3">ユーザー</th>
-                <th scope="col" className="px-4 py-3">アクション</th>
-                <th scope="col" className="px-4 py-3">リソース種別</th>
-                <th scope="col" className="px-4 py-3">リソースID</th>
-                <th scope="col" className="px-4 py-3">IPアドレス</th>
+                <th scope="col" className="px-4 py-3">
+                  日時
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  ユーザー
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  アクション
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  リソース種別
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  リソースID
+                </th>
+                <th scope="col" className="px-4 py-3">
+                  IPアドレス
+                </th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => {
-                const a = actionLabel[log.action] ?? { label: log.action, cls: 'bg-gray-100 text-gray-600' }
+                const a = actionLabel[log.action] ?? {
+                  label: log.action,
+                  cls: "bg-gray-100 text-gray-600",
+                };
                 return (
-                  <tr key={log.id} className="border-b last:border-0 hover:bg-gray-50">
+                  <tr
+                    key={log.id}
+                    className="border-b last:border-0 hover:bg-gray-50"
+                  >
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(log.created_at).toLocaleString('ja-JP')}
+                      {new Date(log.created_at).toLocaleString("ja-JP")}
                     </td>
                     <td className="px-4 py-3">
                       {log.user ? (
-                        <span className="font-medium">{log.user.full_name}</span>
+                        <span className="font-medium">
+                          {log.user.full_name}
+                        </span>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${a.cls}`}>{a.label}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs ${a.cls}`}
+                      >
+                        {a.label}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-gray-500">
-                      {log.resource_type ? resourceTypeLabel[log.resource_type] ?? log.resource_type : '—'}
+                      {log.resource_type
+                        ? (resourceTypeLabel[log.resource_type] ??
+                          log.resource_type)
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-400 font-mono text-xs">
-                      {log.resource_id ? log.resource_id.slice(0, 8) + '...' : '—'}
+                      {log.resource_id
+                        ? log.resource_id.slice(0, 8) + "..."
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-400 font-mono text-xs">
-                      {log.ip_address ?? '—'}
+                      {log.ip_address ?? "—"}
                     </td>
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>
@@ -185,5 +226,5 @@ export function AuditLogs() {
         </div>
       )}
     </div>
-  )
+  );
 }

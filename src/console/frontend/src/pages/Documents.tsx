@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useRef, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listDocumentsPaginated,
   listTrash,
@@ -8,133 +8,139 @@ import {
   deleteDocument,
   downloadDocumentsCsv,
   type DocumentResponse,
-} from '../api/documents'
-import { listProjects } from '../api/projects'
-import { DocumentPreviewModal } from '../components/DocumentPreviewModal'
-import { DocumentTimestampModal } from '../components/DocumentTimestampModal'
-import { classifyDocument, type ClassifyResponse } from '../api/ai'
-import { searchDocuments, type SearchResponse } from '../api/search'
-import { useModalDialog } from '../hooks/useModalDialog'
+} from "../api/documents";
+import { listProjects } from "../api/projects";
+import { DocumentPreviewModal } from "../components/DocumentPreviewModal";
+import { DocumentTimestampModal } from "../components/DocumentTimestampModal";
+import { classifyDocument, type ClassifyResponse } from "../api/ai";
+import { searchDocuments, type SearchResponse } from "../api/search";
+import { useModalDialog } from "../hooks/useModalDialog";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
-  drawing: '図面',
-  specification: '仕様書',
-  report: '報告書',
-  contract: '契約書',
-  other: 'その他',
-}
+  drawing: "図面",
+  specification: "仕様書",
+  report: "報告書",
+  contract: "契約書",
+  other: "その他",
+};
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-  draft: { label: '下書き', cls: 'bg-gray-100 text-gray-600' },
-  pending_review: { label: 'レビュー待ち', cls: 'bg-yellow-100 text-yellow-700' },
-  approved: { label: '承認済', cls: 'bg-green-100 text-green-700' },
-  rejected: { label: '却下', cls: 'bg-red-100 text-red-700' },
-}
+  draft: { label: "下書き", cls: "bg-gray-100 text-gray-600" },
+  pending_review: {
+    label: "レビュー待ち",
+    cls: "bg-yellow-100 text-yellow-700",
+  },
+  approved: { label: "承認済", cls: "bg-green-100 text-green-700" },
+  rejected: { label: "却下", cls: "bg-red-100 text-red-700" },
+};
 
 export function Documents() {
-  const qc = useQueryClient()
-  const [page, setPage] = useState(1)
+  const qc = useQueryClient();
+  const [page, setPage] = useState(1);
   const {
     data: docPage,
     isLoading,
     isError,
     refetch,
   } = useQuery({
-    queryKey: ['documents', page],
+    queryKey: ["documents", page],
     queryFn: () => listDocumentsPaginated(page, 20),
-  })
-  const documents = useMemo(() => docPage?.items ?? [], [docPage])
-  const totalDocuments = docPage?.total ?? 0
-  const totalPages = docPage?.pages ?? 0
-  const [showTrash, setShowTrash] = useState(false)
-  const {
-    data: trashDocs = [],
-    refetch: refetchTrash,
-  } = useQuery({
-    queryKey: ['documents', 'trash'],
+  });
+  const documents = useMemo(() => docPage?.items ?? [], [docPage]);
+  const totalDocuments = docPage?.total ?? 0;
+  const totalPages = docPage?.pages ?? 0;
+  const [showTrash, setShowTrash] = useState(false);
+  const { data: trashDocs = [], refetch: refetchTrash } = useQuery({
+    queryKey: ["documents", "trash"],
     queryFn: listTrash,
     enabled: showTrash,
-  })
+  });
   const {
     data: projects = [],
     isError: projectsError,
     refetch: refetchProjects,
-  } = useQuery({ queryKey: ['projects'], queryFn: listProjects })
+  } = useQuery({ queryKey: ["projects"], queryFn: listProjects });
 
   // Upload form state
-  const [showUpload, setShowUpload] = useState(false)
-  const [title, setTitle] = useState('')
-  const [projectId, setProjectId] = useState('')
-  const [docType, setDocType] = useState('drawing')
-  const [previewDoc, setPreviewDoc] = useState<DocumentResponse | null>(null)
-  const [timestampDoc, setTimestampDoc] = useState<DocumentResponse | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [aiResult, setAiResult] = useState<ClassifyResponse | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
-  const [searchMode, setSearchMode] = useState<'keyword' | 'semantic'>('keyword')
-  const [semanticQuery, setSemanticQuery] = useState('')
-  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [showUpload, setShowUpload] = useState(false);
+  const [title, setTitle] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [docType, setDocType] = useState("drawing");
+  const [previewDoc, setPreviewDoc] = useState<DocumentResponse | null>(null);
+  const [timestampDoc, setTimestampDoc] = useState<DocumentResponse | null>(
+    null,
+  );
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<ClassifyResponse | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [searchMode, setSearchMode] = useState<"keyword" | "semantic">(
+    "keyword",
+  );
+  const [semanticQuery, setSemanticQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Search / filter state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const matchesSearch =
-        searchQuery === '' ||
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesType = filterType === '' || doc.document_type === filterType
-      const matchesStatus = filterStatus === '' || doc.status === filterStatus
-      return matchesSearch && matchesType && matchesStatus
-    })
-  }, [documents, searchQuery, filterType, filterStatus])
+        searchQuery === "" ||
+        doc.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = filterType === "" || doc.document_type === filterType;
+      const matchesStatus = filterStatus === "" || doc.status === filterStatus;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [documents, searchQuery, filterType, filterStatus]);
 
   const upload = useMutation({
     mutationFn: () => {
-      const file = fileRef.current?.files?.[0]
-      if (!file) throw new Error('ファイルを選択してください')
-      return uploadDocument(projectId, title, docType, file)
+      const file = fileRef.current?.files?.[0];
+      if (!file) throw new Error("ファイルを選択してください");
+      return uploadDocument(projectId, title, docType, file);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents'] })
-      setShowUpload(false)
-      setTitle('')
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      setShowUpload(false);
+      setTitle("");
     },
-  })
+  });
 
   const remove = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents'] })
-      setConfirmDeleteId(null)
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      setConfirmDeleteId(null);
     },
-  })
+  });
 
   const restore = useMutation({
     mutationFn: restoreDocument,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents'] })
-      void refetchTrash()
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      void refetchTrash();
     },
-  })
+  });
 
   const classify = useMutation({
     mutationFn: classifyDocument,
     onSuccess: (result) => {
-      setAiResult(result)
-      qc.invalidateQueries({ queryKey: ['documents'] })
+      setAiResult(result);
+      qc.invalidateQueries({ queryKey: ["documents"] });
     },
-  })
+  });
 
   const semanticSearch = useMutation({
     mutationFn: () => searchDocuments(semanticQuery, searchMode),
     onSuccess: (result) => setSearchResult(result),
-  })
+  });
 
-  const aiResultDialogRef = useModalDialog(aiResult !== null, () => setAiResult(null))
+  const aiResultDialogRef = useModalDialog(aiResult !== null, () =>
+    setAiResult(null),
+  );
 
   return (
     <div className="p-8">
@@ -145,25 +151,25 @@ export function Documents() {
             type="button"
             disabled={isExporting}
             onClick={() => {
-              setIsExporting(true)
+              setIsExporting(true);
               downloadDocumentsCsv()
                 .catch(() => undefined)
-                .finally(() => setIsExporting(false))
+                .finally(() => setIsExporting(false));
             }}
             className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            {isExporting ? '出力中...' : 'CSV出力'}
+            {isExporting ? "出力中..." : "CSV出力"}
           </button>
           <button
             type="button"
             onClick={() => {
-              setShowTrash((v) => !v)
-              setPage(1)
+              setShowTrash((v) => !v);
+              setPage(1);
             }}
             className={`text-sm px-4 py-2 rounded-lg border transition-colors ${
               showTrash
-                ? 'bg-gray-700 text-white border-gray-700'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                ? "bg-gray-700 text-white border-gray-700"
+                : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
             ごみ箱
@@ -179,10 +185,17 @@ export function Documents() {
 
       {showUpload && (
         <div className="bg-white rounded-xl shadow p-6 mb-6">
-          <h2 className="font-semibold text-gray-700 mb-4">ドキュメントのアップロード</h2>
+          <h2 className="font-semibold text-gray-700 mb-4">
+            ドキュメントのアップロード
+          </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="doc-title" className="block text-sm text-gray-600 mb-1">タイトル</label>
+              <label
+                htmlFor="doc-title"
+                className="block text-sm text-gray-600 mb-1"
+              >
+                タイトル
+              </label>
               <input
                 id="doc-title"
                 required
@@ -192,7 +205,12 @@ export function Documents() {
               />
             </div>
             <div>
-              <label htmlFor="doc-project" className="block text-sm text-gray-600 mb-1">プロジェクト</label>
+              <label
+                htmlFor="doc-project"
+                className="block text-sm text-gray-600 mb-1"
+              >
+                プロジェクト
+              </label>
               <select
                 id="doc-project"
                 required
@@ -202,12 +220,19 @@ export function Documents() {
               >
                 <option value="">選択してください</option>
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="doc-type" className="block text-sm text-gray-600 mb-1">種別</label>
+              <label
+                htmlFor="doc-type"
+                className="block text-sm text-gray-600 mb-1"
+              >
+                種別
+              </label>
               <select
                 id="doc-type"
                 className="w-full border rounded px-3 py-2 text-sm"
@@ -222,12 +247,26 @@ export function Documents() {
               </select>
             </div>
             <div>
-              <label htmlFor="doc-file" className="block text-sm text-gray-600 mb-1">PDFファイル</label>
-              <input id="doc-file" type="file" accept=".pdf" required ref={fileRef} className="text-sm" />
+              <label
+                htmlFor="doc-file"
+                className="block text-sm text-gray-600 mb-1"
+              >
+                PDFファイル
+              </label>
+              <input
+                id="doc-file"
+                type="file"
+                accept=".pdf"
+                required
+                ref={fileRef}
+                className="text-sm"
+              />
             </div>
           </div>
           {upload.error && (
-            <p role="alert" className="text-red-600 text-sm mt-2">{String(upload.error)}</p>
+            <p role="alert" className="text-red-600 text-sm mt-2">
+              {String(upload.error)}
+            </p>
           )}
           <div className="flex gap-3 mt-4">
             <button
@@ -235,7 +274,7 @@ export function Documents() {
               disabled={upload.isPending}
               className="bg-blue-700 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
             >
-              {upload.isPending ? 'アップロード中...' : 'アップロード'}
+              {upload.isPending ? "アップロード中..." : "アップロード"}
             </button>
             <button
               onClick={() => setShowUpload(false)}
@@ -250,10 +289,14 @@ export function Documents() {
       {/* AI Search bar */}
       <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 mb-4 border border-purple-100">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-purple-700">✦ AI 文書検索</span>
+          <span className="text-sm font-semibold text-purple-700">
+            ✦ AI 文書検索
+          </span>
           <select
             value={searchMode}
-            onChange={(e) => setSearchMode(e.target.value as 'keyword' | 'semantic')}
+            onChange={(e) =>
+              setSearchMode(e.target.value as "keyword" | "semantic")
+            }
             className="text-xs border rounded px-2 py-1 text-gray-600"
           >
             <option value="keyword">キーワード検索</option>
@@ -266,7 +309,9 @@ export function Documents() {
             placeholder="例: 橋梁補修 / 平面図 / 鉄筋コンクリート..."
             value={semanticQuery}
             onChange={(e) => setSemanticQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && semanticQuery && semanticSearch.mutate()}
+            onKeyDown={(e) =>
+              e.key === "Enter" && semanticQuery && semanticSearch.mutate()
+            }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
             aria-label="AI検索クエリ"
           />
@@ -275,10 +320,18 @@ export function Documents() {
             disabled={!semanticQuery || semanticSearch.isPending}
             className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
           >
-            {semanticSearch.isPending ? '検索中...' : '検索'}
+            {semanticSearch.isPending ? "検索中..." : "検索"}
           </button>
           {searchResult && (
-            <button onClick={() => { setSearchResult(null); setSemanticQuery('') }} className="text-xs text-gray-400 hover:text-gray-600 px-2">クリア</button>
+            <button
+              onClick={() => {
+                setSearchResult(null);
+                setSemanticQuery("");
+              }}
+              className="text-xs text-gray-400 hover:text-gray-600 px-2"
+            >
+              クリア
+            </button>
           )}
         </div>
         {searchResult && (
@@ -287,20 +340,30 @@ export function Documents() {
               {searchResult.total} 件ヒット
               {searchResult.expanded_terms.length > 1 && (
                 <span className="ml-2 text-purple-600">
-                  展開: {searchResult.expanded_terms.slice(0, 5).join('、')}
+                  展開: {searchResult.expanded_terms.slice(0, 5).join("、")}
                 </span>
               )}
             </p>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {searchResult.hits.map((hit) => (
-                <div key={hit.document_id} className="bg-white rounded p-2 text-xs border border-purple-100">
+                <div
+                  key={hit.document_id}
+                  className="bg-white rounded p-2 text-xs border border-purple-100"
+                >
                   <span className="font-medium text-gray-800">{hit.title}</span>
                   {hit.snippet && (
                     <p className="text-gray-500 mt-0.5 truncate">
                       {hit.snippet.split(/\*\*(.*?)\*\*/).map((part, i) =>
-                        i % 2 === 1
-                          ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{part}</mark>
-                          : <span key={i}>{part}</span>
+                        i % 2 === 1 ? (
+                          <mark
+                            key={i}
+                            className="bg-yellow-100 text-yellow-900 rounded px-0.5"
+                          >
+                            {part}
+                          </mark>
+                        ) : (
+                          <span key={i}>{part}</span>
+                        ),
                       )}
                     </p>
                   )}
@@ -319,8 +382,8 @@ export function Documents() {
           <span>データの読み込みに失敗しました</span>
           <button
             onClick={() => {
-              void refetch()
-              void refetchProjects()
+              void refetch();
+              void refetchProjects();
             }}
             className="text-xs px-2 py-1 rounded border border-red-300 hover:bg-red-100"
           >
@@ -347,7 +410,9 @@ export function Documents() {
         >
           <option value="">すべての種別</option>
           {Object.entries(DOC_TYPE_LABELS).map(([val, lbl]) => (
-            <option key={val} value={val}>{lbl}</option>
+            <option key={val} value={val}>
+              {lbl}
+            </option>
           ))}
         </select>
         <select
@@ -358,12 +423,18 @@ export function Documents() {
         >
           <option value="">すべてのステータス</option>
           {Object.entries(STATUS_LABELS).map(([val, { label }]) => (
-            <option key={val} value={val}>{label}</option>
+            <option key={val} value={val}>
+              {label}
+            </option>
           ))}
         </select>
         {(searchQuery || filterType || filterStatus) && (
           <button
-            onClick={() => { setSearchQuery(''); setFilterType(''); setFilterStatus('') }}
+            onClick={() => {
+              setSearchQuery("");
+              setFilterType("");
+              setFilterStatus("");
+            }}
             className="text-xs text-gray-500 underline px-2"
           >
             クリア
@@ -379,31 +450,48 @@ export function Documents() {
             <table className="w-full text-sm min-w-[640px]">
               <thead className="border-b">
                 <tr className="text-left text-gray-500">
-                  <th scope="col" className="px-4 py-3">タイトル</th>
-                  <th scope="col" className="px-4 py-3">種別</th>
-                  <th scope="col" className="px-4 py-3">削除日</th>
+                  <th scope="col" className="px-4 py-3">
+                    タイトル
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    種別
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    削除日
+                  </th>
                   <th scope="col" className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {trashDocs.map((doc) => (
-                  <tr key={doc.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-600">{doc.title}</td>
+                  <tr
+                    key={doc.id}
+                    className="border-b last:border-0 hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-600">
+                      {doc.title}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {DOC_TYPE_LABELS[doc.document_type] ?? doc.document_type}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
                       {doc.deletion_requested_at
-                        ? new Date(doc.deletion_requested_at).toLocaleDateString('ja-JP')
-                        : '—'}
+                        ? new Date(
+                            doc.deletion_requested_at,
+                          ).toLocaleDateString("ja-JP")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => restore.mutate(doc.id)}
-                        disabled={restore.isPending && restore.variables === doc.id}
+                        disabled={
+                          restore.isPending && restore.variables === doc.id
+                        }
                         className="text-blue-600 hover:text-blue-800 text-xs disabled:opacity-50"
                       >
-                        {restore.isPending && restore.variables === doc.id ? '復元中...' : '復元'}
+                        {restore.isPending && restore.variables === doc.id
+                          ? "復元中..."
+                          : "復元"}
                       </button>
                     </td>
                   </tr>
@@ -413,120 +501,155 @@ export function Documents() {
           )}
         </div>
       ) : (
-      <div className="bg-white rounded-xl shadow overflow-x-auto">
-        {isLoading ? (
-          <p className="p-6 text-gray-400 text-sm">読み込み中...</p>
-        ) : filteredDocuments.length === 0 ? (
-          <p className="p-6 text-gray-400 text-sm">
-            {documents.length > 0 ? '条件に一致するドキュメントがありません' : 'ドキュメントがありません'}
-          </p>
-        ) : (
-          <table className="w-full text-sm min-w-[760px]">
-            <thead className="border-b">
-              <tr className="text-left text-gray-500">
-                <th scope="col" className="px-4 py-3">タイトル</th>
-                <th scope="col" className="px-4 py-3">種別</th>
-                <th scope="col" className="px-4 py-3">ステータス</th>
-                <th scope="col" className="px-4 py-3">AI タグ</th>
-                <th scope="col" className="px-4 py-3">サイズ</th>
-                <th scope="col" className="px-4 py-3">登録日</th>
-                <th scope="col" className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDocuments.map((doc) => {
-                const s = STATUS_LABELS[doc.status] ?? { label: doc.status, cls: 'bg-blue-100 text-blue-700' }
-                return (
-                  <tr key={doc.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{doc.title}</td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {DOC_TYPE_LABELS[doc.document_type] ?? doc.document_type}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${s.cls}`}>
-                        {s.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(doc.tags ?? []).filter(t => t.startsWith('図面:') || t.startsWith('種別:')).map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {(doc.tags ?? []).includes('ai分類済') && (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-indigo-100 text-indigo-600">
-                            ✦AI
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {(doc.file_size / 1024).toFixed(0)} KB
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {new Date(doc.created_at).toLocaleDateString('ja-JP')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setPreviewDoc(doc)}
-                          className="text-blue-600 hover:text-blue-800 text-xs"
+        <div className="bg-white rounded-xl shadow overflow-x-auto">
+          {isLoading ? (
+            <p className="p-6 text-gray-400 text-sm">読み込み中...</p>
+          ) : filteredDocuments.length === 0 ? (
+            <p className="p-6 text-gray-400 text-sm">
+              {documents.length > 0
+                ? "条件に一致するドキュメントがありません"
+                : "ドキュメントがありません"}
+            </p>
+          ) : (
+            <table className="w-full text-sm min-w-[760px]">
+              <thead className="border-b">
+                <tr className="text-left text-gray-500">
+                  <th scope="col" className="px-4 py-3">
+                    タイトル
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    種別
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    ステータス
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    AI タグ
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    サイズ
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    登録日
+                  </th>
+                  <th scope="col" className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDocuments.map((doc) => {
+                  const s = STATUS_LABELS[doc.status] ?? {
+                    label: doc.status,
+                    cls: "bg-blue-100 text-blue-700",
+                  };
+                  return (
+                    <tr
+                      key={doc.id}
+                      className="border-b last:border-0 hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3 font-medium">{doc.title}</td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {DOC_TYPE_LABELS[doc.document_type] ??
+                          doc.document_type}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs ${s.cls}`}
                         >
-                          プレビュー
-                        </button>
-                        <button
-                          onClick={() => classify.mutate(doc.id)}
-                          disabled={classify.isPending && classify.variables === doc.id}
-                          className="text-purple-600 hover:text-purple-800 text-xs disabled:opacity-50"
-                          title="Claude AIで文書を分類"
-                        >
-                          {classify.isPending && classify.variables === doc.id ? '分類中...' : 'AI分類'}
-                        </button>
-                        <button
-                          onClick={() => setTimestampDoc(doc)}
-                          className="text-indigo-600 hover:text-indigo-800 text-xs"
-                          title="電子タイムスタンプ（電子帳簿保存法・e-文書法）"
-                        >
-                          🔏TS
-                        </button>
-                        {confirmDeleteId === doc.id ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="text-xs text-gray-500">削除しますか?</span>
-                            <button
-                              onClick={() => remove.mutate(doc.id)}
-                              disabled={remove.isPending}
-                              className="text-red-600 hover:text-red-800 text-xs font-semibold disabled:opacity-50"
-                            >
-                              削除する
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="text-gray-500 hover:text-gray-700 text-xs"
-                            >
-                              キャンセル
-                            </button>
-                          </span>
-                        ) : (
+                          {s.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(doc.tags ?? [])
+                            .filter(
+                              (t) =>
+                                t.startsWith("図面:") || t.startsWith("種別:"),
+                            )
+                            .map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          {(doc.tags ?? []).includes("ai分類済") && (
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-indigo-100 text-indigo-600">
+                              ✦AI
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {(doc.file_size / 1024).toFixed(0)} KB
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {new Date(doc.created_at).toLocaleDateString("ja-JP")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-3">
                           <button
-                            onClick={() => setConfirmDeleteId(doc.id)}
-                            className="text-red-500 hover:text-red-700 text-xs"
+                            onClick={() => setPreviewDoc(doc)}
+                            className="text-blue-600 hover:text-blue-800 text-xs"
                           >
-                            削除
+                            プレビュー
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                          <button
+                            onClick={() => classify.mutate(doc.id)}
+                            disabled={
+                              classify.isPending &&
+                              classify.variables === doc.id
+                            }
+                            className="text-purple-600 hover:text-purple-800 text-xs disabled:opacity-50"
+                            title="Claude AIで文書を分類"
+                          >
+                            {classify.isPending && classify.variables === doc.id
+                              ? "分類中..."
+                              : "AI分類"}
+                          </button>
+                          <button
+                            onClick={() => setTimestampDoc(doc)}
+                            className="text-indigo-600 hover:text-indigo-800 text-xs"
+                            title="電子タイムスタンプ（電子帳簿保存法・e-文書法）"
+                          >
+                            🔏TS
+                          </button>
+                          {confirmDeleteId === doc.id ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-xs text-gray-500">
+                                削除しますか?
+                              </span>
+                              <button
+                                onClick={() => remove.mutate(doc.id)}
+                                disabled={remove.isPending}
+                                className="text-red-600 hover:text-red-800 text-xs font-semibold disabled:opacity-50"
+                              >
+                                削除する
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="text-gray-500 hover:text-gray-700 text-xs"
+                              >
+                                キャンセル
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeleteId(doc.id)}
+                              className="text-red-500 hover:text-red-700 text-xs"
+                            >
+                              削除
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       {!showTrash && totalDocuments > 0 && (
@@ -585,27 +708,42 @@ export function Documents() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 id="ai-result-title" className="text-lg font-bold text-gray-800">✦ AI 分類結果</h2>
-              <button onClick={() => setAiResult(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <h2
+                id="ai-result-title"
+                className="text-lg font-bold text-gray-800"
+              >
+                ✦ AI 分類結果
+              </h2>
+              <button
+                onClick={() => setAiResult(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ×
+              </button>
             </div>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-gray-500">図面種別</dt>
-                <dd className="font-medium">{aiResult.drawing_type ?? '—'}</dd>
+                <dd className="font-medium">{aiResult.drawing_type ?? "—"}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">プロジェクト種別</dt>
-                <dd className="font-medium">{aiResult.project_type ?? '—'}</dd>
+                <dd className="font-medium">{aiResult.project_type ?? "—"}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-gray-500">信頼度</dt>
-                <dd className="font-medium">{(aiResult.confidence * 100).toFixed(0)}%</dd>
+                <dd className="font-medium">
+                  {(aiResult.confidence * 100).toFixed(0)}%
+                </dd>
               </div>
               <div>
                 <dt className="text-gray-500 mb-1">付与タグ</dt>
                 <dd className="flex flex-wrap gap-1">
                   {aiResult.tags.map((tag) => (
-                    <span key={tag} className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
+                    <span
+                      key={tag}
+                      className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700"
+                    >
                       {tag}
                     </span>
                   ))}
@@ -626,5 +764,5 @@ export function Documents() {
         </div>
       )}
     </div>
-  )
+  );
 }
