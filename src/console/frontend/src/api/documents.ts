@@ -53,7 +53,10 @@ export async function listDocuments(
 }
 
 export async function downloadDocumentsCsv(
-  params: Pick<ListDocumentsParams, "project_id" | "document_type" | "status"> = {},
+  params: Pick<
+    ListDocumentsParams,
+    "project_id" | "document_type" | "status"
+  > = {},
 ): Promise<void> {
   const res = await api.get<Blob>("/documents/export.csv", {
     params,

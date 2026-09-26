@@ -8,9 +8,7 @@ import { ElectronicDeliveryModal } from "../components/ElectronicDeliveryModal";
 vi.mock("../api/electronicDelivery", () => ({
   checkDeliveryReadiness: vi.fn(),
   downloadDeliveryZip: vi.fn(),
-  deliveryErrorMessage: vi
-    .fn()
-    .mockResolvedValue("ZIP 生成に失敗しました。"),
+  deliveryErrorMessage: vi.fn().mockResolvedValue("ZIP 生成に失敗しました。"),
 }));
 
 import {
@@ -200,7 +198,9 @@ describe("ElectronicDeliveryModal", () => {
         screen.getByText("読み取れないファイル（納品パッケージにできません）:"),
       ).toBeInTheDocument();
     });
-    expect(screen.getByText(/欠損図面 — ファイルが存在しません/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/欠損図面 — ファイルが存在しません/),
+    ).toBeInTheDocument();
   });
 
   it("surfaces the server's reason when packaging is refused", async () => {
@@ -221,7 +221,11 @@ describe("ElectronicDeliveryModal", () => {
     });
     await user.click(screen.getByRole("button", { name: /ZIP ダウンロード/ }));
     await waitFor(() => {
-      expect(screen.getByText(new RegExp("ファイルを読み取れない文書が 1 件あるため"))).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          new RegExp("ファイルを読み取れない文書が 1 件あるため"),
+        ),
+      ).toBeInTheDocument();
     });
   });
 

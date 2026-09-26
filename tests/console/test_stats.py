@@ -358,9 +358,7 @@ class TestDailyStats:
         ).json()["series"]
         assert sum(p["count"] for p in admin_series) >= 2
 
-    def test_dx_sync_stats_aggregates_imports(
-        self, client, admin_token, manager_token
-    ):
+    def test_dx_sync_stats_aggregates_imports(self, client, admin_token, manager_token):
         project_id = _create_project(client, admin_token, code="STAT-DX")
         doc_id = _upload(client, admin_token, project_id, title="DX Doc")
 

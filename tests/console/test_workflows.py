@@ -1,4 +1,5 @@
 """Approval workflow API tests."""
+
 import io
 
 
@@ -19,6 +20,7 @@ def _upload_doc(client, admin_token, project_id: str, title: str = "Doc") -> str
 
 def _create_project(client, admin_token) -> str:
     import uuid
+
     code = f"WF-{uuid.uuid4().hex[:6].upper()}"
     resp = client.post(
         "/api/v1/projects/",
@@ -69,8 +71,16 @@ class TestWorkflow:
         project_id = _create_project(client, admin_token)
         doc_id = _upload_doc(client, admin_token, project_id)
         payload = {"document_id": doc_id, "approver_ids": [admin_user.id]}
-        client.post("/api/v1/workflows/", json=payload, headers={"Authorization": f"Bearer {admin_token}"})
-        resp = client.post("/api/v1/workflows/", json=payload, headers={"Authorization": f"Bearer {admin_token}"})
+        client.post(
+            "/api/v1/workflows/",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp = client.post(
+            "/api/v1/workflows/",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
         assert resp.status_code == 409
 
     def test_workflow_no_approvers_rejected(self, client, admin_token):
@@ -135,7 +145,12 @@ class TestWorkflow:
         # Create another user to attempt approving
         client.post(
             "/api/v1/users/",
-            json={"email": "other@example.com", "username": "other1", "full_name": "Other", "password": "Other123!"},
+            json={
+                "email": "other@example.com",
+                "username": "other1",
+                "full_name": "Other",
+                "password": "Other123!",
+            },
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         other_token = client.post(
@@ -159,7 +174,10 @@ class TestWorkflow:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         workflow_id = wf_resp.json()["id"]
-        resp = client.get(f"/api/v1/workflows/{workflow_id}", headers={"Authorization": f"Bearer {admin_token}"})
+        resp = client.get(
+            f"/api/v1/workflows/{workflow_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
         assert resp.status_code == 200
         assert resp.json()["id"] == workflow_id
 
@@ -229,7 +247,9 @@ class TestWorkflow:
         )
         assert resp.status_code == 409
 
-    def test_multi_step_workflow_next_step_activated(self, client, admin_user, admin_token):
+    def test_multi_step_workflow_next_step_activated(
+        self, client, admin_user, admin_token
+    ):
         """Approving step 1 should leave step 2 pending (next step activation)."""
         project_id = _create_project(client, admin_token)
         doc_id = _upload_doc(client, admin_token, project_id)

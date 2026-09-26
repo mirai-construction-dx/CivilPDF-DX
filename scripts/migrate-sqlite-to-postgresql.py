@@ -94,8 +94,12 @@ def main():
     dst_meta = MetaData()
     dst_meta.reflect(bind=dst_engine)
 
-    src_tables = {name: t for name, t in src_meta.tables.items() if name not in EXCLUDE_TABLES}
-    dst_tables = {name: t for name, t in dst_meta.tables.items() if name not in EXCLUDE_TABLES}
+    src_tables = {
+        name: t for name, t in src_meta.tables.items() if name not in EXCLUDE_TABLES
+    }
+    dst_tables = {
+        name: t for name, t in dst_meta.tables.items() if name not in EXCLUDE_TABLES
+    }
 
     report = []
     with src_engine.connect() as src_conn, dst_engine.begin() as dst_conn:
@@ -124,11 +128,12 @@ def main():
 
                 # 整数 PK（serial/identity）のシーケンスを同期
                 for col in dst_table.primary_key.columns:
-                    if "integer" in str(col.type).lower() and col.autoincrement is not False:
+                    if (
+                        "integer" in str(col.type).lower()
+                        and col.autoincrement is not False
+                    ):
                         seq = dst_conn.execute(
-                            text(
-                                "SELECT pg_get_serial_sequence(:t, :c)"
-                            ),
+                            text("SELECT pg_get_serial_sequence(:t, :c)"),
                             {"t": name, "c": col.name},
                         ).scalar()
                         if seq:
@@ -137,7 +142,9 @@ def main():
                             ).scalar()
                             next_val = (max_id or 0) + 1
                             dst_conn.execute(
-                                text(f"SELECT setval('{seq}', :v, {1 if max_id else 0})"),
+                                text(
+                                    f"SELECT setval('{seq}', :v, {1 if max_id else 0})"
+                                ),
                                 {"v": next_val},
                             )
             report.append((name, "OK", "", len(rows)))

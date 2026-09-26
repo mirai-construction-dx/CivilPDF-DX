@@ -1,4 +1,5 @@
 """Tests for services/pdfa_validator.py — PDF/A validation (ISO 14289)."""
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock, patch
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_pdf_bytes() -> bytes:
     """Minimal syntactically-valid PDF bytes for testing."""
@@ -15,6 +17,7 @@ def _make_pdf_bytes() -> bytes:
 # ---------------------------------------------------------------------------
 # pypdf fallback path
 # ---------------------------------------------------------------------------
+
 
 class TestPypdfFallback:
     @patch("services.pdfa_validator.VERA_PDF_CMD", None)
@@ -52,7 +55,9 @@ class TestPypdfFallback:
         mock_conformance.text = "B"
 
         mock_xmp = MagicMock()
-        mock_xmp.get_element.side_effect = lambda *a: mock_conformance if a[2] == "conformance" else mock_part
+        mock_xmp.get_element.side_effect = (
+            lambda *a: mock_conformance if a[2] == "conformance" else mock_part
+        )
 
         mock_reader = MagicMock()
         mock_reader.xmp_metadata = mock_xmp
@@ -81,6 +86,7 @@ class TestPypdfFallback:
 # veraPDF path
 # ---------------------------------------------------------------------------
 
+
 class TestVeraPDF:
     @patch("services.pdfa_validator.VERA_PDF_CMD", "/usr/bin/verapdf")
     def test_compliant_report_parsed(self, tmp_path):
@@ -89,17 +95,21 @@ class TestVeraPDF:
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(_make_pdf_bytes())
 
-        vera_output = json.dumps({
-            "report": {
-                "jobs": [{
-                    "validationResult": {
-                        "compliant": True,
-                        "profileName": "PDF/A-3b validation profile",
-                        "assertions": {"failedChecks": 0},
-                    }
-                }]
+        vera_output = json.dumps(
+            {
+                "report": {
+                    "jobs": [
+                        {
+                            "validationResult": {
+                                "compliant": True,
+                                "profileName": "PDF/A-3b validation profile",
+                                "assertions": {"failedChecks": 0},
+                            }
+                        }
+                    ]
+                }
             }
-        })
+        )
 
         mock_proc = MagicMock()
         mock_proc.stdout = vera_output
@@ -119,17 +129,21 @@ class TestVeraPDF:
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(_make_pdf_bytes())
 
-        vera_output = json.dumps({
-            "report": {
-                "jobs": [{
-                    "validationResult": {
-                        "compliant": False,
-                        "profileName": "",
-                        "assertions": {"failedChecks": 5},
-                    }
-                }]
+        vera_output = json.dumps(
+            {
+                "report": {
+                    "jobs": [
+                        {
+                            "validationResult": {
+                                "compliant": False,
+                                "profileName": "",
+                                "assertions": {"failedChecks": 5},
+                            }
+                        }
+                    ]
+                }
             }
-        })
+        )
         mock_proc = MagicMock()
         mock_proc.stdout = vera_output
 
@@ -147,7 +161,10 @@ class TestVeraPDF:
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"x")
 
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="verapdf", timeout=60)):
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="verapdf", timeout=60),
+        ):
             result = _validate_with_verapdf(str(pdf_file))
 
         assert result["is_pdfa"] is False
@@ -162,7 +179,14 @@ class TestVeraPDF:
         pdf_file.write_bytes(_make_pdf_bytes())
 
         with patch("services.pdfa_validator._validate_with_verapdf") as mock_vera:
-            mock_vera.return_value = {"is_pdfa": True, "pdfa_version": "PDF/A-3b", "conformant": True, "validator": "veraPDF", "warnings": [], "errors": []}
+            mock_vera.return_value = {
+                "is_pdfa": True,
+                "pdfa_version": "PDF/A-3b",
+                "conformant": True,
+                "validator": "veraPDF",
+                "warnings": [],
+                "errors": [],
+            }
             result = validate_pdfa(b"bytes", str(pdf_file))
 
         mock_vera.assert_called_once_with(str(pdf_file))
@@ -173,7 +197,14 @@ class TestVeraPDF:
         from services.pdfa_validator import validate_pdfa
 
         with patch("services.pdfa_validator._validate_with_pypdf") as mock_pyp:
-            mock_pyp.return_value = {"is_pdfa": False, "pdfa_version": None, "conformant": False, "validator": "pypdf", "warnings": [], "errors": []}
+            mock_pyp.return_value = {
+                "is_pdfa": False,
+                "pdfa_version": None,
+                "conformant": False,
+                "validator": "pypdf",
+                "warnings": [],
+                "errors": [],
+            }
             result = validate_pdfa(b"bytes", "/nonexistent/path.pdf")
 
         mock_pyp.assert_called_once()
