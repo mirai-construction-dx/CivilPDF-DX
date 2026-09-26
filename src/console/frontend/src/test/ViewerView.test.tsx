@@ -178,6 +178,15 @@ describe("ViewerView", () => {
       // 静的チェック項目が表示される
       expect(screen.getByText("縮尺表記の不一致")).toBeInTheDocument();
     });
+    // Sample items must be labelled so they are not read as real results.
+    expect(screen.getByTestId("check-demo-notice")).toHaveTextContent(
+      "選択中の文書の検査結果ではありません",
+    );
+    expect(screen.getByText("チェック結果（サンプル）")).toBeInTheDocument();
+    // The tab badge must not show sample NG/warning counts as if real.
+    const checkTab = screen.getByRole("tab", { name: /チェック/ });
+    expect(checkTab).toHaveTextContent("デモ");
+    expect(checkTab.textContent).not.toMatch(/\d/);
   });
 
   it("gracefully falls back to demo mode when API call fails", async () => {
@@ -240,7 +249,9 @@ describe("ViewerView", () => {
     // Metadata lives behind the メタ情報 tab.
     fireEvent.click(await screen.findByRole("tab", { name: /メタ情報/ }));
     await waitFor(() => {
-      expect(screen.getByText("選択された文書はありません")).toBeInTheDocument();
+      expect(
+        screen.getByText("選択された文書はありません"),
+      ).toBeInTheDocument();
     });
     expect(screen.queryByText(/県道○○号_詳細図/)).not.toBeInTheDocument();
     expect(screen.queryByText(/AutoCAD 2024/)).not.toBeInTheDocument();

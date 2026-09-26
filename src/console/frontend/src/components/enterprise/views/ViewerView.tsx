@@ -602,27 +602,17 @@ export function ViewerView({
             >
               {tab.label}
               {tab.key === "check" && (
-                <span style={{ marginLeft: "4px" }}>
-                  {ngCount > 0 && (
-                    <span
-                      className="ep-pill ep-pill-ng"
-                      style={{ padding: "0 4px", fontSize: "9px" }}
-                    >
-                      {ngCount}
-                    </span>
-                  )}
-                  {warnCount > 0 && (
-                    <span
-                      className="ep-pill ep-pill-warn"
-                      style={{
-                        padding: "0 4px",
-                        fontSize: "9px",
-                        marginLeft: "2px",
-                      }}
-                    >
-                      {warnCount}
-                    </span>
-                  )}
+                // Sample data only: show a demo marker, not NG/warning counts
+                // that would read as results for the open document.
+                <span
+                  className="ep-pill ep-pill-warn"
+                  style={{
+                    marginLeft: "4px",
+                    padding: "0 4px",
+                    fontSize: "9px",
+                  }}
+                >
+                  デモ
                 </span>
               )}
             </button>
@@ -632,8 +622,24 @@ export function ViewerView({
         <div className="ep-ve-content">
           {activeTab === "check" && (
             <div className="ep-ve-section">
+              {/* Automatic drawing checks are not implemented yet: these items are
+                  fixed samples and must not read as results for the open document. */}
+              <div
+                data-testid="check-demo-notice"
+                style={{
+                  fontSize: "11px",
+                  color: "var(--muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  marginBottom: "6px",
+                }}
+              >
+                <span className="ep-pill ep-pill-warn">デモ</span>
+                自動チェックは未実装です。以下は表示サンプルで、選択中の文書の検査結果ではありません
+              </div>
               <h4>
-                チェック結果
+                チェック結果（サンプル）
                 <span style={{ display: "flex", gap: "4px" }}>
                   <span
                     style={{

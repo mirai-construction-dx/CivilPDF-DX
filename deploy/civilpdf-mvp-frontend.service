@@ -6,7 +6,7 @@ Wants=civilpdf-mvp-backend.service
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX/src/console/frontend
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/src/console/frontend
 
 Environment=PATH=%h/.nvm/versions/node/v25.2.1/bin:/usr/local/bin:/usr/bin:/bin
 Environment=VITE_API_URL=http://127.0.0.1:8181

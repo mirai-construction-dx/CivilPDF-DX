@@ -13,7 +13,7 @@ Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX/src/console/backend
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/src/console/backend
 
 # %h/.local/bin に Alembic / uvicorn がインストールされていることを前提にする
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin

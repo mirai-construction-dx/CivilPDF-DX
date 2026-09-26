@@ -13,7 +13,7 @@ Wants=civilpdf-backend.service
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Projects/Mirai-DX-Project/CivilPDF-DX/src/console/frontend
+WorkingDirectory=%h/Projects/Mirai-Construction-DX/CivilPDF-DX/src/console/frontend
 
 # nvm-managed Node — expose the active version to systemd
 Environment=PATH=%h/.nvm/versions/node/v25.2.1/bin:/usr/local/bin:/usr/bin:/bin
