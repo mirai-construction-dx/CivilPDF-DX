@@ -19,6 +19,7 @@ jobs:
           cache-dependency-path: src/console/backend/requirements-dev.txt
       - run: pip install ruff==0.8.6
       - run: ruff check src/console/backend/
+      - run: ruff check tests/ scripts/
       - run: ruff format --check src/console/backend/
 
   backend-test:
