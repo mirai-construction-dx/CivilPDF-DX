@@ -132,6 +132,22 @@ def main() -> int:
         ok = dx_sync.status_code == 200 and dx_sync.json().get("total", 0) >= 5
         check("dx-sync metrics", ok, f"total={dx_sync.json().get('total')}")
 
+        # App distribution: Windows-only installers, macOS announced as pending.
+        apps = client.get("/api/v1/apps/releases", headers=headers)
+        body = apps.json() if apps.status_code == 200 else {}
+        platforms = {p.get("platform") for p in body.get("packages", [])}
+        pending = [p.get("platform") for p in body.get("pending_platforms", [])]
+        ok = (
+            apps.status_code == 200
+            and platforms == {"windows"}
+            and pending == ["macos"]
+        )
+        check(
+            "apps distribution (windows only)",
+            ok,
+            f"platforms={sorted(platforms)} pending={pending}",
+        )
+
         # RBAC: a viewer must not be able to read the admin-only audit log.
         viewer_login = client.post(
             "/api/v1/auth/token",
