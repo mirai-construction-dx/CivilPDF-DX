@@ -29,9 +29,9 @@ def test_upload_dir_is_not_the_deployed_default():
 def test_upload_dir_is_a_temporary_directory():
     """The isolated directory should be an obvious throwaway path."""
     upload_dir = settings.upload_dir
-    assert "test" in upload_dir.lower() or "tmp" in upload_dir.lower(), (
-        f"expected a throwaway upload directory, got {upload_dir!r}"
-    )
+    assert (
+        "test" in upload_dir.lower() or "tmp" in upload_dir.lower()
+    ), f"expected a throwaway upload directory, got {upload_dir!r}"
 
 
 def test_isolated_upload_dir_is_writable_and_empty_at_start():
@@ -49,6 +49,6 @@ def test_database_url_is_not_a_remote_host():
     """Unit tests must run on a local database, never against a remote server."""
     url = settings.database_url
     for remote_marker in ("neon.tech", "amazonaws.com", "supabase"):
-        assert remote_marker not in url, (
-            f"tests are pointed at a remote database ({remote_marker}): {url.split('@')[-1]}"
-        )
+        assert (
+            remote_marker not in url
+        ), f"tests are pointed at a remote database ({remote_marker}): {url.split('@')[-1]}"
