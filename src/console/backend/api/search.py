@@ -1,7 +1,6 @@
 """Full-text and semantic document search API (Phase 7 P2)."""
 
 import json
-import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,6 +12,7 @@ from auth.dependencies import get_current_user
 from database import get_db
 from models.document import Document
 from models.user import User, UserRole
+from services import ai_settings as ai_settings_service
 from services.access_control import visible_documents_query
 
 router = APIRouter(prefix="/search", tags=["Search"])
@@ -201,9 +201,15 @@ _EXPAND_SYSTEM = """あなたは建設業の文書検索エキスパートです
 必ずJSON配列で返してください: ["term1", "term2", ...]"""
 
 
-def _expand_query_with_claude(query: str) -> list[str]:
-    """Use Claude to expand search query into related terms. Falls back to original on error."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+def _expand_query_with_claude(query: str, db: Session) -> list[str]:
+    """Use Claude to expand search query into related terms. Falls back to original on error.
+
+    Honours the same admin kill switch, key and model settings as the AI API
+    (services.ai_settings) instead of reading the environment directly.
+    """
+    if not ai_settings_service.is_ai_enabled(db):
+        return [query]
+    api_key = ai_settings_service.get_api_key(db)
     if not api_key:
         return [query]
 
@@ -212,6 +218,8 @@ def _expand_query_with_claude(query: str) -> list[str]:
 
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
+            # Query expansion runs on every semantic search: keep the small,
+            # cheap model regardless of the (possibly larger) admin setting.
             model="claude-haiku-4-5-20251001",
             max_tokens=128,
             system=_EXPAND_SYSTEM,
@@ -307,7 +315,7 @@ def search_documents(
         _rebuild_fts_index(db)
 
     if mode == "semantic":
-        expanded_terms = _expand_query_with_claude(q)
+        expanded_terms = _expand_query_with_claude(q, db)
     else:
         expanded_terms = [q]
 
@@ -370,9 +378,8 @@ def reindex_documents(
 @router.get("/documents/suggest", response_model=list[str])
 def suggest_terms(
     q: str = Query(..., min_length=1, max_length=100),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[str]:
     """Return AI-expanded search terms for a query (used by frontend autocomplete)."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return [q]
-    return _expand_query_with_claude(q)
+    return _expand_query_with_claude(q, db)
