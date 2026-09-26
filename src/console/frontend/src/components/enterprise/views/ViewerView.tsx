@@ -632,8 +632,24 @@ export function ViewerView({
         <div className="ep-ve-content">
           {activeTab === "check" && (
             <div className="ep-ve-section">
+              {/* Automatic drawing checks are not implemented yet: these items are
+                  fixed samples and must not read as results for the open document. */}
+              <div
+                data-testid="check-demo-notice"
+                style={{
+                  fontSize: "11px",
+                  color: "var(--muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  marginBottom: "6px",
+                }}
+              >
+                <span className="ep-pill ep-pill-warn">デモ</span>
+                自動チェックは未実装です。以下は表示サンプルで、選択中の文書の検査結果ではありません
+              </div>
               <h4>
-                チェック結果
+                チェック結果（サンプル）
                 <span style={{ display: "flex", gap: "4px" }}>
                   <span
                     style={{
