@@ -27,10 +27,10 @@
 
 ## 2. デプロイ手順（新リリース）
 
-0. 反映前の読み取り専用チェック: `./scripts/pre-deploy-check.sh`（checkout が main かつ origin/main と一致・追跡ファイルの変更なし・`.env` が 600・ヘルス/バックアップ鮮度・ロールバック用イメージタグ・配布リンク。FAIL が 0 件になるまで進めない）
 0. リリース前確認: `./scripts/verify-version-sync.sh` で `VERSION`・env 例・文書の整合を確認
 1. バックアップ取得: `./scripts/backup-production.sh`
 2. リポジトリを main の検証済み commit へ更新（本番チェックアウトは `~/Projects/Mirai-Construction-DX/CivilPDF-DX`。2026-09 の GitHub 組織移管に伴い旧 `~/Projects/Mirai-DX-Project/CivilPDF-DX` から移動・旧パスは消滅。compose プロジェクト名はディレクトリ名 `CivilPDF-DX` 由来の `civilpdf-dx` のままなので、新パスから同じ本番スタックを操作できる。本番 env はこの checkout の `.env`（Git 管理外））。以降の手順（イメージ再ビルド docker compose -f docker-compose.prod.yml up -d --build、スモーク ./scripts/healthcheck-civilpdf.sh、ログ確認 docker compose logs --tail 100 backend）は compose 本番構成で実施する。旧構成（ホスト直 uvicorn 8180 / vite preview 5182）は 2026-09-18 に退役: 旧 civilpdf-backend.service は Neon 失効認証情報（2026-08-29 失効）を参照し続け /health が 200 でも DB 依存リクエストが 500 の状態で稼働していた（2026-09-18 実測）、旧 civilpdf-backup.service は 21日間 Neon への pg_dump に失敗し続けていた。退役手順は deploy/civilpdf-backend.service 等の RETIRED 注記を参照。
+3. 反映前の読み取り専用チェック（手順 2 で main を更新した**後**、`up -d --build` の**直前**に実行）: `./scripts/pre-deploy-check.sh`。checkout が main かつ origin/main と一致・追跡ファイルの変更なし・`.env` が group/others に権限なし（600 推奨）・ヘルス/バックアップ鮮度・ロールバック用イメージタグ・配布リンクを確認する。**FAIL が 0 件になるまで再ビルドに進まない**
 
 ## 3. バックアップと復旧
 

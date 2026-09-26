@@ -23,18 +23,26 @@ def _write_exec(path: Path, body: str) -> Path:
     return path
 
 
+# Isolate from the developer's git config (signing, hooks) and GIT_* env.
+_GIT_ENV = {
+    **{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_NOSYSTEM": "1",
+}
+
+
 def _git(cwd: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, env=_GIT_ENV
+    )
 
 
 @pytest.fixture
 def repo(tmp_path):
     origin = tmp_path / "origin.git"
     work = tmp_path / "work"
-    subprocess.run(
-        ["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True
-    )
-    subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    _git(tmp_path, "init", "-q", "-b", "main", str(work))
     _git(work, "config", "user.email", "t@example.test")
     _git(work, "config", "user.name", "t")
     (work / "state.json").write_text("{}\n")
@@ -63,13 +71,14 @@ def repo(tmp_path):
         tmp_path / "py", f'env | grep APPS_ > "{py_args}"; exit "$(cat "{py_rc}")"\n'
     )
     env = {
-        **os.environ,
+        **_GIT_ENV,
         "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}",
         "CIVILPDF_PROJECT_DIR": str(work),
         "CIVILPDF_HEALTHCHECK": str(healthcheck),
         "CIVILPDF_PYTHON": str(fake_python),
     }
     return {
+        "bindir": bindir,
         "work": work,
         "env": env,
         "images": images,
@@ -150,3 +159,55 @@ def test_installer_check_uses_apps_values_and_never_prints_secrets(repo):
     assert "APPS_SHA256_WIN_EXE=aaa" in passed and "APPS_SHA256_WIN_MSI=bbb" in passed
     assert _SECRET not in res.stdout + res.stderr
     assert _SECRET not in passed
+
+
+def test_unreachable_origin_fails_instead_of_passing(repo):
+    _git(repo["work"], "remote", "set-url", "origin", str(repo["work"] / "nope.git"))
+    res = _run(repo)
+    assert res.returncode == 1
+    assert "could not read origin/main" in res.stdout
+
+
+def test_path_with_space_is_reported_intact(repo):
+    spaced = repo["work"] / "my file.txt"
+    spaced.write_text("a\n")
+    _git(repo["work"], "add", "my file.txt")
+    _git(repo["work"], "commit", "-q", "-m", "spaced")
+    _git(repo["work"], "push", "-q", "origin", "main")
+    spaced.write_text("b\n")
+    res = _run(repo)
+    assert "tracked changes besides state.json: my file.txt" in res.stdout
+
+
+def test_unusable_docker_is_reported_as_unchecked(repo):
+    # e.g. user not in the docker group: `docker image ls` exits non-zero.
+    _write_exec(repo["bindir"] / "docker", 'echo "permission denied" >&2; exit 1\n')
+    res = _run(repo)
+    assert res.returncode == 0
+    assert "cannot list docker images" in res.stdout
+    assert "no rollback tag for" not in res.stdout
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        'APPS_RELEASE_BASE_URL="https://example.test/editor-v1"',
+        "APPS_RELEASE_BASE_URL='https://example.test/editor-v1'\r",
+        "export APPS_RELEASE_BASE_URL = https://example.test/editor-v1  ",
+    ],
+)
+def test_env_value_is_normalized_like_compose(repo, line):
+    (repo["work"] / ".env").write_text(f'{line}\nAPPS_SHA256_WIN_EXE="aaa"\n')
+    (repo["work"] / ".env").chmod(0o600)
+    res = _run(repo)
+    assert "(https://example.test/editor-v1)" in res.stdout
+    assert "APPS_SHA256_WIN_EXE=aaa\n" in repo["py_args"].read_text()
+
+
+def test_checker_crash_is_distinguished_from_link_failure(repo):
+    (repo["work"] / ".env").write_text("APPS_RELEASE_BASE_URL=https://example.test/x\n")
+    (repo["work"] / ".env").chmod(0o600)
+    repo["py_rc"].write_text("2")
+    res = _run(repo)
+    assert res.returncode == 1
+    assert "check-editor-assets.py itself failed (rc=2" in res.stdout
