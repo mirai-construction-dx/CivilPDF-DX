@@ -224,9 +224,12 @@ def verify_chain(db: Session, limit: Optional[int] = None) -> dict:
     - records_checked: int
     - first_broken_sequence: int | None
     - error: str | None
-    - total_records: int — chained records in the table
-    - complete: bool — True when every chained record was checked (a
-      ``chain_valid`` of a partial check says nothing about later records)
+    - total_records: int — chained records counted when the call began
+    - complete: bool — True when every record counted at the start of the
+      call was checked (a ``chain_valid`` of a partial check says nothing
+      about later records). Records appended concurrently while the check is
+      running are outside that snapshot and are not verified by this call;
+      run the check again to cover them.
     """
     total = (
         db.query(AuditLog)
