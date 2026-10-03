@@ -8,7 +8,7 @@ from models.user import User, Project
 from auth.dependencies import get_current_user, require_manager
 from api.schemas import ProjectCreate, ProjectResponse
 from services.audit_chain_service import create_chained_audit_log
-from services.access_control import assert_project_visible
+from services.access_control import assert_project_visible, can_access_all
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -19,7 +19,8 @@ def list_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.value == "admin":
+    if can_access_all(current_user):
+        # §5.2 プロジェクト参照: admin / manager は全案件 (A-1)
         q = db.query(Project)
         if organization_id:
             q = q.filter(Project.organization_id == organization_id)

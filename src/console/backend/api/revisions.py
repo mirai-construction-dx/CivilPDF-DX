@@ -35,6 +35,9 @@ async def upload_revision(
     _require_manager(current_user)
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    if doc.deletion_requested_at is not None:
+        # AT-DOC-006: a document in the trash is not found for writes either.
+        raise HTTPException(status_code=404, detail="Document not found")
     content = await file.read()
     if not content.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="File content is not a valid PDF")

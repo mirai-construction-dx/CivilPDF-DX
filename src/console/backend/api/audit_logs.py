@@ -38,9 +38,16 @@ def list_audit_logs(
     resource_type: Optional[str] = None,
     resource_id: Optional[str] = None,
     user_id: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """List audit logs (admin only).
+
+    ``date_from`` / ``date_to`` use the same names and inclusive semantics as
+    ``/audit-logs/export.csv`` (WEB-AUDIT-003 / AT-AUDIT-004).
+    """
     _require_admin(current_user)
 
     q = db.query(AuditLog)
@@ -52,6 +59,10 @@ def list_audit_logs(
         q = q.filter(AuditLog.resource_id == resource_id)
     if user_id:
         q = q.filter(AuditLog.user_id == user_id)
+    if date_from is not None:
+        q = q.filter(AuditLog.created_at >= date_from)
+    if date_to is not None:
+        q = q.filter(AuditLog.created_at <= date_to)
 
     total = q.count()
     logs = (
@@ -166,6 +177,9 @@ class ChainVerifyResponse(BaseModel):
     records_checked: int
     first_broken_sequence: Optional[int]
     error: Optional[str]
+    # Added 2026-10: lets callers tell a full verification from a partial one.
+    total_records: int
+    complete: bool
 
 
 @router.get(
@@ -174,11 +188,18 @@ class ChainVerifyResponse(BaseModel):
     summary="監査ログ ハッシュチェーン検証 (NIS2/ISO 19650)",
     description=(
         "監査ログのハッシュチェーン整合性を検証します。"
-        "chain_valid=true の場合、ログが改ざんされていないことを確認できます。"
+        "既定では全レコードを検証します。limit を指定した場合は先頭から limit 件のみを"
+        "検証し、complete=false（records_checked < total_records）になります。"
+        "chain_valid=true かつ complete=true の場合に、記録済みの全ログについて"
+        "改ざんが検出されなかったことを示します。"
     ),
 )
 def verify_audit_chain(
-    limit: int = Query(1000, ge=1, le=10000, description="検証するレコード数の上限"),
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        description="検証するレコード数の上限（省略時は全件検証）",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

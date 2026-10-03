@@ -717,10 +717,14 @@ export function Documents() {
               <button
                 onClick={() => setAiResult(null)}
                 className="text-gray-400 hover:text-gray-600 text-xl"
+                aria-label="閉じる"
               >
                 ×
               </button>
             </div>
+            <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              AI による提案です。内容を確認し、必要に応じて修正してください。
+            </p>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-gray-500">図面種別</dt>
@@ -737,7 +741,9 @@ export function Documents() {
                 </dd>
               </div>
               <div>
-                <dt className="text-gray-500 mb-1">付与タグ</dt>
+                <dt className="text-gray-500 mb-1">
+                  文書のタグ（AI 付与分を含め保存済み）
+                </dt>
                 <dd className="flex flex-wrap gap-1">
                   {aiResult.tags.map((tag) => (
                     <span

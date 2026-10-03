@@ -14,10 +14,27 @@ from api.schemas import (
     ApprovalDecision,
 )
 from services.audit_chain_service import create_chained_audit_log
-from services.access_control import assert_document_visible, document_visible
+from services.access_control import (
+    assert_document_visible,
+    can_be_approver,
+    can_write_documents,
+    document_visible,
+)
 from services.notification_service import create_notification
 
 router = APIRouter(prefix="/workflows", tags=["Approval Workflows"])
+
+
+def _assert_not_in_trash(doc: Document) -> None:
+    """C-2: documents in the trash cannot enter or progress an approval flow."""
+    if doc.deletion_requested_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Document is in the trash; workflows cannot be created or "
+                "decided until it is restored"
+            ),
+        )
 
 
 @router.get("/", response_model=list[WorkflowListItem])
@@ -57,6 +74,12 @@ def create_workflow(
 ):
     doc = db.query(Document).filter(Document.id == body.document_id).first()
     assert_document_visible(doc, current_user)
+    if not can_write_documents(current_user):
+        # §5.2 ワークフロー作成: viewer は不可
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+    _assert_not_in_trash(doc)
 
     if (
         db.query(ApprovalWorkflow)
@@ -74,17 +97,31 @@ def create_workflow(
             detail="At least one approver is required",
         )
 
-    workflow = ApprovalWorkflow(document_id=body.document_id, status="in_progress")
-    db.add(workflow)
-    db.flush()
-
-    for i, approver_id in enumerate(body.approver_ids):
+    # Validate every approver before writing anything so a rejected request
+    # leaves no partial workflow behind.
+    for approver_id in body.approver_ids:
         approver = db.query(User).filter(User.id == approver_id).first()
         if not approver:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Approver {approver_id} not found",
             )
+        if not can_be_approver(doc, approver):
+            # §5.2 ※1 (A-3): approvers must be able to view the document and
+            # viewers can never approve.
+            raise HTTPException(
+                status_code=422,  # Unprocessable Content
+                detail=(
+                    f"Approver {approver_id} cannot be assigned: approvers must "
+                    "be able to view the document and must not be viewers"
+                ),
+            )
+
+    workflow = ApprovalWorkflow(document_id=body.document_id, status="in_progress")
+    db.add(workflow)
+    db.flush()
+
+    for i, approver_id in enumerate(body.approver_ids):
         step = ApprovalStep(
             workflow_id=workflow.id,
             approver_id=approver_id,
@@ -152,15 +189,29 @@ def decide_step(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Step not found"
         )
+    # A-3 / D-3: a user who cannot view the document cannot see the workflow
+    # either, so the step is reported as missing rather than forbidden.
+    if not document_visible(step.workflow.document, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Step not found"
+        )
     if step.approver_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not the approver for this step",
         )
+    # A-3 / §5.2: re-check the approver conditions at decision time, so a
+    # user demoted to viewer after being assigned cannot approve.
+    if not can_be_approver(step.workflow.document, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role can no longer approve this step",
+        )
     if step.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Step already decided"
         )
+    _assert_not_in_trash(step.workflow.document)
 
     # Enforce approval order: all previous steps must be approved first.
     previous_steps = (

@@ -171,15 +171,26 @@ def test_check_delivery_requires_auth(client: TestClient, db_session):
 
 
 def test_generate_zip_empty_project(client: TestClient, admin_token: str, db_session):
+    """E-1 (user decision 2026-10-03): a project with no deliverable document is
+    refused (409) instead of returning an INDEX.XML-only ZIP, consistent with
+    the readiness check (ready=false) and with the unreadable-file 409."""
+    from models.audit_log import AuditLog
+
     proj = _create_project(db_session)
-    resp = client.post(
-        f"/api/v1/projects/{proj.id}/electronic-delivery",
-        headers={"Authorization": f"Bearer {admin_token}"},
+    for query in ("", "?allow_partial=true"):
+        resp = client.post(
+            f"/api/v1/projects/{proj.id}/electronic-delivery{query}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 409
+        assert "1件もない" in resp.json()["detail"]
+        assert resp.headers["content-type"].startswith("application/json")
+    assert (
+        db_session.query(AuditLog)
+        .filter(AuditLog.action == "electronic_delivery.generated")
+        .count()
+        == 0
     )
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "application/zip"
-    assert "attachment" in resp.headers["content-disposition"]
-    assert ".zip" in resp.headers["content-disposition"]
 
 
 def test_generate_zip_with_drawing(
@@ -266,9 +277,11 @@ def test_generate_zip_index_xml_content(
 
 
 def test_generate_zip_filename_sanitized(
-    client: TestClient, admin_token: str, db_session
+    client: TestClient, admin_token: str, admin_user: User, db_session
 ):
     proj = _create_project(db_session, code="工事/001", name="テスト")
+    # E-1: an empty project is refused (409), so package one document.
+    _create_document(db_session, proj.id, admin_user.id)
     resp = client.post(
         f"/api/v1/projects/{proj.id}/electronic-delivery",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -332,9 +345,11 @@ def test_generate_zip_forbidden_for_viewer(
 
 
 def test_generate_zip_response_headers(
-    client: TestClient, admin_token: str, db_session
+    client: TestClient, admin_token: str, admin_user: User, db_session
 ):
     proj = _create_project(db_session)
+    # E-1: an empty project is refused (409), so package one document.
+    _create_document(db_session, proj.id, admin_user.id)
     resp = client.post(
         f"/api/v1/projects/{proj.id}/electronic-delivery",
         headers={"Authorization": f"Bearer {admin_token}"},

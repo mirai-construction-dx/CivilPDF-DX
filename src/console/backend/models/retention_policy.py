@@ -62,11 +62,13 @@ DEFAULT_POLICIES = [
         "name": "国税関係書類（電子帳簿保存法）",
         "category": RetentionCategory.TAX_RECORDS.value,
         "document_type": "contract",
+        # 2026-10-03 decision B-2: contracts are kept 7 years, counted from the
+        # upload date (requirements.md §3.2.4).
         "retention_years": 7,
         "is_permanent": False,
         "auto_archive": True,
         "auto_delete": False,
-        "legal_basis": "電子帳簿保存法 第4条・第7条、国税通則法 第70条",
+        "legal_basis": "社内決定 B-2（2026-10-03・契約書は7年、アップロード日起算）",
     },
     {
         "name": "公共工事書類（品確法）",
@@ -82,11 +84,13 @@ DEFAULT_POLICIES = [
         "name": "電子納品書類（国交省）",
         "category": RetentionCategory.ELECTRONIC_SUBMISSION.value,
         "document_type": "drawing",
-        "retention_years": -1,
-        "is_permanent": True,
+        # 2026-10-03 decision B-2: drawings are kept 10 years, counted from the
+        # upload date (requirements.md §3.2.4). Previously permanent.
+        "retention_years": 10,
+        "is_permanent": False,
         "auto_archive": False,
         "auto_delete": False,
-        "legal_basis": "国土交通省 電子納品要領（令和5年3月版）",
+        "legal_basis": "社内決定 B-2（2026-10-03・図面は10年、アップロード日起算）",
     },
     {
         "name": "建設業法主要書類",

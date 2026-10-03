@@ -125,6 +125,23 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - 実行結果: `journalctl --user -u civilpdf-retention.service`、`--json` で機械可読出力
 - 手動での即時実行（管理者 API）: `POST /api/v1/privacy/admin/run-deletion-job?dry_run=true`
 
+### 4.2.1 保存年数の変更（2026-10-03 決定 B-2）を既存環境へ反映する
+
+既定の保存年数は契約書7年・図面10年（アップロード日起算）に変わった。ただしコードの既定値
+（`models/retention_policy.py` の `DEFAULT_POLICIES`）は **`retention_policies` テーブルが空のときだけ**
+投入される。`retention-job.py` やデモデータ投入を一度でも実行した環境ではテーブルに旧値の行が残り、
+**新しくアップロードする図面にも旧値（永久保存）が適用され続ける**（契約書は旧値も7年で影響なし）。
+
+- 確認（読み取りのみ）:
+  ```bash
+  docker compose -f docker-compose.prod.yml exec -T db sh -lc \
+    'psql -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT document_type, retention_years, is_permanent FROM retention_policies ORDER BY document_type;"'
+  ```
+- `drawing` が `-1` / `is_permanent = t` のままなら、更新が必要。**本番 DB の変更は人が行う**
+  （バックアップ取得後、変更内容を記録する）。自動で更新するデータ移行は別 PR で対応する予定
+- 既にアップロード済みの文書の `retention_expires_at` は、行を更新しても**再計算されない**。
+  再計算するかどうかは別途判断する
+
 ## 4.1 バックアップ復元訓練（四半期）
 
 - `deploy/civilpdf-restore-drill.timer` が四半期毎（1/4/7/10 月 1 日 10:00 JST）に復元訓練を自動実行
