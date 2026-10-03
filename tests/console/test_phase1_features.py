@@ -137,11 +137,17 @@ class TestNotifications:
     ):
         project_id = _create_project(client, admin_token)
         doc_id = _upload_doc(client, admin_token, project_id)
+        # A-3: the approver must be able to view the document.
         client.post(
+            f"/api/v1/projects/{project_id}/members/{engineer_user.id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        created = client.post(
             "/api/v1/workflows/",
             json={"document_id": doc_id, "approver_ids": [engineer_user.id]},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
+        assert created.status_code == 201
         resp = client.get(
             "/api/v1/notifications/",
             headers={"Authorization": f"Bearer {engineer_token}"},

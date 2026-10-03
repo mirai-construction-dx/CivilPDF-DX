@@ -157,6 +157,20 @@ class TestWorkflow:
             "/api/v1/auth/token",
             data={"username": "other@example.com", "password": "Other123!"},
         ).json()["access_token"]
+        # A-3: the intruder must be able to view the document so that this test
+        # exercises the "not the assigned approver" check (403) rather than the
+        # visibility check (404). Make them a project member.
+        other_id = next(
+            u["id"]
+            for u in client.get(
+                "/api/v1/users/", headers={"Authorization": f"Bearer {admin_token}"}
+            ).json()
+            if u["email"] == "other@example.com"
+        )
+        client.post(
+            f"/api/v1/projects/{project_id}/members/{other_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
 
         resp = client.post(
             f"/api/v1/workflows/{workflow_id}/steps/{step_id}/decide",

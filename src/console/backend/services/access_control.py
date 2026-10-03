@@ -82,6 +82,34 @@ def assert_project_visible(project: Optional[Project], user: User) -> Project:
     return project
 
 
+def can_write_documents(user: User) -> bool:
+    """§5.2: 文書アップロード・ワークフロー作成は viewer 以外に許可する."""
+    return user.role in (UserRole.ADMIN, UserRole.MANAGER, UserRole.ENGINEER)
+
+
+def can_delete_document(doc: Document, user: User) -> bool:
+    """§5.2 文書削除 (※3 ごみ箱からの復元も同じ権限).
+
+    admin は全文書、manager / engineer は自分の文書のみ、viewer は不可。
+    文書の可視性 (404 秘匿) は呼び出し側で先に確認すること。
+    """
+    if user.role == UserRole.ADMIN:
+        return True
+    if user.role in (UserRole.MANAGER, UserRole.ENGINEER):
+        return doc.owner_id == user.id
+    return False
+
+
+def can_be_approver(doc: Document, user: User) -> bool:
+    """§5.2 ※1: 承認者は文書を閲覧できるユーザーに限り、viewer は不可 (A-3).
+
+    admin は承認者に指定できる (2026-10-03 決定)。
+    """
+    if user.role == UserRole.VIEWER:
+        return False
+    return document_visible(doc, user)
+
+
 def project_ids_for_filter(user: User) -> Optional[Iterable[str]]:
     """Return project ids used for SQL filtering, or None for full access."""
     if can_access_all(user):

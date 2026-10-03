@@ -44,6 +44,8 @@ from services.audit_chain_service import create_chained_audit_log
 from services.access_control import (
     assert_document_visible,
     assert_project_visible,
+    can_delete_document,
+    can_write_documents,
     visible_documents_query,
 )
 
@@ -63,6 +65,32 @@ def _safe_filename(filename: str) -> str:
 def _ensure_pdf_content(first_chunk: bytes) -> bool:
     """Return True when the uploaded content looks like a PDF (magic bytes)."""
     return first_chunk.startswith(b"%PDF-")
+
+
+# extra_data keys used to restore the pre-deletion state (WEB-DOC-005 C-1).
+_STATUS_BEFORE_DELETION = "status_before_deletion"
+_ARCHIVED_BEFORE_DELETION = "is_archived_before_deletion"
+
+
+def _assert_not_trashed(doc: Document) -> Document:
+    """AT-DOC-006: soft-deleted documents are 404 on direct-URL reads.
+
+    The trash list and the restore endpoint are the only ways to reach a
+    document that is in the trash.
+    """
+    if doc.deletion_requested_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
+    return doc
+
+
+def _assert_can_delete(doc: Document, user: User) -> None:
+    """§5.2 文書削除 / ※3 復元: admin=全て, manager/engineer=自分, viewer=不可."""
+    if not can_delete_document(doc, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
 
 @router.get("/", response_model=None)
@@ -238,6 +266,11 @@ async def upload_document(
 ):
     project = db.query(Project).filter(Project.id == project_id).first()
     assert_project_visible(project, current_user)
+    if not can_write_documents(current_user):
+        # §5.2 文書アップロード: viewer は不可
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -342,6 +375,9 @@ async def upload_document(
                     if hasattr(document_type, "value")
                     else str(document_type)
                 ),
+                # Initial content hash, so the chain holds the original even if
+                # the file is later changed and re-stamped (decision D-1).
+                "file_hash": doc.timestamp_hash,
             },
             ensure_ascii=False,
         ),
@@ -357,7 +393,22 @@ def get_document(
     current_user: User = Depends(get_current_user),
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
-    return assert_document_visible(doc, current_user)
+    assert_document_visible(doc, current_user)
+    _assert_not_trashed(doc)
+    # D-3b (2026-10-03): record document views (READ) in the tamper-evident
+    # chain. Only successful views are recorded; the client IP comes from the
+    # request context. Downloads are recorded separately as document.downloaded.
+    create_chained_audit_log(
+        db,
+        user_id=current_user.id,
+        action="document.viewed",
+        resource_type="document",
+        resource_id=doc.id,
+        detail=None,
+        ip_address=None,
+    )
+    db.refresh(doc)
+    return doc
 
 
 @router.patch("/{doc_id}", response_model=DocumentResponse)
@@ -369,6 +420,7 @@ def update_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_not_trashed(doc)
     if doc.owner_id != current_user.id and current_user.role.value not in (
         "admin",
         "manager",
@@ -401,6 +453,7 @@ def download_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_not_trashed(doc)
     if not doc.file_path or not Path(doc.file_path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
@@ -465,6 +518,7 @@ async def apply_timestamp(
     """Apply RFC 3161 timestamp to an existing document (電子帳簿保存法・e-文書法)."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_not_trashed(doc)
     if doc.owner_id != current_user.id and current_user.role.value not in (
         "admin",
         "manager",
@@ -480,6 +534,12 @@ async def apply_timestamp(
     file_content = Path(doc.file_path).read_bytes()
     ts = timestamp_service.generate_timestamp(file_content, doc.filename)
 
+    # Re-stamping overwrites the single timestamp field on the document. Keep
+    # the superseded hash in the tamper-evident audit chain so a re-stamp after
+    # the file changed stays traceable (requirements v1.1.0, decision D-1).
+    previous_hash = doc.timestamp_hash
+    previous_verified_at = doc.timestamp_verified_at
+
     doc.timestamp_hash = ts["file_hash"]
     doc.timestamp_token = ts["token_b64"]
     doc.timestamp_tsa_url = ts["tsa_url"]
@@ -492,7 +552,19 @@ async def apply_timestamp(
         action="document.timestamped",
         resource_type="document",
         resource_id=doc.id,
-        detail=json.dumps({"token_type": ts["token_type"], "tsa_url": ts["tsa_url"]}),
+        detail=json.dumps(
+            {
+                "token_type": ts["token_type"],
+                "tsa_url": ts["tsa_url"],
+                "file_hash": ts["file_hash"],
+                "previous_file_hash": previous_hash,
+                "previous_verified_at": (
+                    previous_verified_at.isoformat() if previous_verified_at else None
+                ),
+                "hash_changed": bool(previous_hash)
+                and previous_hash != ts["file_hash"],
+            }
+        ),
         ip_address=None,
     )
 
@@ -515,6 +587,7 @@ def verify_timestamp(
     """Verify that the stored timestamp matches the current file content."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_not_trashed(doc)
 
     if not doc.timestamp_hash or not doc.timestamp_token:
         return TimestampVerifyResponse(
@@ -554,10 +627,24 @@ def delete_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_can_delete(doc, current_user)
+
+    if doc.deletion_requested_at is not None:
+        # B-4: idempotent. Keep the first deletion request time (the 30-day
+        # grace period starts from it) and do not log a second deletion.
+        return
 
     # Soft delete: retention/GDPR requires a grace period before physical
     # removal. The background deletion job performs the physical erasure.
     now = datetime.now(timezone.utc)
+    # C-1: remember the pre-deletion state so restore can bring it back
+    # (no dedicated column; stored in the existing extra_data JSON).
+    status_value = doc.status.value if hasattr(doc.status, "value") else doc.status
+    doc.extra_data = {
+        **(doc.extra_data or {}),
+        _STATUS_BEFORE_DELETION: status_value,
+        _ARCHIVED_BEFORE_DELETION: bool(doc.is_archived),
+    }
     doc.deletion_requested_at = now
     doc.is_archived = True
     doc.status = DocumentStatus.ARCHIVED
@@ -582,14 +669,43 @@ def restore_document(
     """Restore a soft-deleted document (ごみ箱から復元)."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_can_delete(doc, current_user)
     if doc.deletion_requested_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Document is not in the trash",
         )
+    if not doc.file_path:
+        # The deletion job already erased the file (services/deletion_job.py
+        # nulls file_path); there is nothing left to restore.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document has already been physically deleted",
+        )
+    # C-1: restore the pre-deletion status. Legacy rows deleted before the
+    # state was recorded fall back to DRAFT. Approval workflows are untouched.
+    extra = dict(doc.extra_data or {})
+    saved_status = extra.pop(_STATUS_BEFORE_DELETION, None)
+    saved_archived = extra.pop(_ARCHIVED_BEFORE_DELETION, False)
+    if saved_status:
+        try:
+            restored_status = DocumentStatus(saved_status)
+        except ValueError:
+            restored_status = DocumentStatus.DRAFT
+        restored_archived = bool(saved_archived)
+    elif doc.status != DocumentStatus.ARCHIVED:
+        # Trashed by a path that does not record the prior state (e.g. the
+        # GDPR deletion request in api/privacy.py only sets
+        # deletion_requested_at). The status was never changed, so keep it.
+        restored_status = doc.status
+        restored_archived = bool(doc.is_archived)
+    else:
+        restored_status = DocumentStatus.DRAFT
+        restored_archived = False
+    doc.extra_data = extra
     doc.deletion_requested_at = None
-    doc.is_archived = False
-    doc.status = DocumentStatus.DRAFT
+    doc.is_archived = restored_archived
+    doc.status = restored_status
     db.commit()
     db.refresh(doc)
     create_chained_audit_log(
