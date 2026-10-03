@@ -11,10 +11,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.audit_log import AuditLog
+from services.request_context import current_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,31 @@ def _compute_record_hash(
     return hashlib.sha256(data).hexdigest()
 
 
+# Arbitrary fixed key for pg_advisory_xact_lock: serializes all audit-chain
+# appends on PostgreSQL ("CIVLAUDT" as ASCII, fits in a signed 64-bit int).
+_AUDIT_CHAIN_LOCK_KEY = 0x4349564C41554454
+
+
+def _serialize_chain_appends(db: Session) -> None:
+    """Serialize audit-chain appends across sessions (PostgreSQL only).
+
+    SELECT ... FOR UPDATE on the last row is not enough under READ COMMITTED:
+    a waiter that gets the lock re-checks the *old* last row and computes the
+    same next sequence_number, so N concurrent appends cost up to N-1 retries.
+    Viewing a document is an append since 2026-10-03 (document.viewed), which
+    makes that contention common. A transaction-scoped advisory lock taken
+    *before* reading the last row means each appender reads the committed tip.
+    The lock is released at the end of the caller's transaction (commit or
+    rollback). SQLite (tests, MVP) serializes writes itself; nothing to do.
+    """
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": _AUDIT_CHAIN_LOCK_KEY},
+        )
+
+
 def get_last_record(db: Session, *, for_update: bool = False) -> Optional[AuditLog]:
     """Return the most recent AuditLog by sequence_number.
 
@@ -101,7 +128,14 @@ def create_chained_audit_log(
     changes the caller already made on the same session (e.g. the resource
     this audit entry is about, if not yet committed) survive the retry.
     """
+    if ip_address is None:
+        # Routers that never see the Request pass ip_address=None; use the IP
+        # AuditMiddleware stored for the current HTTP request (requirements
+        # §5.4). Outside a request (scheduled jobs) this stays None.
+        ip_address = current_client_ip()
+
     for attempt in range(_retries):
+        _serialize_chain_appends(db)
         last = get_last_record(db, for_update=True)
         prev_hash = last.record_hash if (last and last.record_hash) else GENESIS_HASH
         next_seq = (
@@ -157,66 +191,109 @@ def create_chained_audit_log(
     raise RuntimeError("unreachable")  # loop always returns or raises
 
 
-def verify_chain(db: Session, limit: int = 1000) -> dict:
+VERIFY_BATCH_SIZE = 1000
+
+_CHAIN_COLUMNS = (
+    AuditLog.sequence_number,
+    AuditLog.prev_hash,
+    AuditLog.record_hash,
+    AuditLog.user_id,
+    AuditLog.action,
+    AuditLog.resource_type,
+    AuditLog.resource_id,
+    AuditLog.detail,
+    AuditLog.ip_address,
+    AuditLog.created_at,
+)
+
+
+def verify_chain(db: Session, limit: Optional[int] = None) -> dict:
     """Verify the integrity of the hash chain.
 
+    Args:
+        db: SQLAlchemy session.
+        limit: Verify only the first ``limit`` records (by sequence_number).
+            ``None`` (default) verifies the whole chain. Records are read in
+            batches of ``VERIFY_BATCH_SIZE`` so a long chain is not loaded at
+            once. Previously the default silently stopped after 1,000 records
+            and still reported ``chain_valid=True``, so tampering beyond that
+            point was never detected.
+
     Returns:
-    - chain_valid: bool
+    - chain_valid: bool — no break found in the records checked
     - records_checked: int
     - first_broken_sequence: int | None
     - error: str | None
+    - total_records: int — chained records in the table
+    - complete: bool — True when every chained record was checked (a
+      ``chain_valid`` of a partial check says nothing about later records)
     """
-    records = (
+    total = (
         db.query(AuditLog)
         .filter(AuditLog.sequence_number != None)  # noqa: E711
-        .order_by(AuditLog.sequence_number.asc())
-        .limit(limit)
-        .all()
+        .count()
     )
+    target = total if limit is None else min(limit, total)
 
-    if not records:
+    def _result(valid: bool, checked: int, broken, error) -> dict:
         return {
-            "chain_valid": True,
-            "records_checked": 0,
-            "first_broken_sequence": None,
-            "error": None,
+            "chain_valid": valid,
+            "records_checked": checked,
+            "first_broken_sequence": broken,
+            "error": error,
+            "total_records": total,
+            "complete": checked >= total,
         }
 
     prev_hash = GENESIS_HASH
-    for record in records:
-        if record.prev_hash != prev_hash:
-            return {
-                "chain_valid": False,
-                "records_checked": record.sequence_number,
-                "first_broken_sequence": record.sequence_number,
-                "error": f"prev_hash mismatch at sequence {record.sequence_number}",
-            }
-
-        expected_hash = _compute_record_hash(
-            prev_hash=record.prev_hash or GENESIS_HASH,
-            sequence_number=record.sequence_number,
-            user_id=record.user_id,
-            action=record.action,
-            resource_type=record.resource_type,
-            resource_id=record.resource_id,
-            detail=record.detail,
-            ip_address=record.ip_address,
-            created_at_iso=_normalize_dt(record.created_at),
+    checked = 0
+    last_seq: Optional[int] = None
+    while checked < target:
+        # Column tuples (not ORM entities): nothing is added to the session's
+        # identity map, so memory stays bounded on long chains and objects the
+        # caller already holds are left untouched.
+        q = db.query(*_CHAIN_COLUMNS).filter(
+            AuditLog.sequence_number != None  # noqa: E711
         )
+        if last_seq is not None:
+            q = q.filter(AuditLog.sequence_number > last_seq)
+        batch = (
+            q.order_by(AuditLog.sequence_number.asc())
+            .limit(min(VERIFY_BATCH_SIZE, target - checked))
+            .all()
+        )
+        if not batch:
+            break
+        for record in batch:
+            if record.prev_hash != prev_hash:
+                return _result(
+                    False,
+                    checked + 1,
+                    record.sequence_number,
+                    f"prev_hash mismatch at sequence {record.sequence_number}",
+                )
 
-        if record.record_hash != expected_hash:
-            return {
-                "chain_valid": False,
-                "records_checked": record.sequence_number,
-                "first_broken_sequence": record.sequence_number,
-                "error": f"record_hash tampered at sequence {record.sequence_number}",
-            }
+            expected_hash = _compute_record_hash(
+                prev_hash=record.prev_hash or GENESIS_HASH,
+                sequence_number=record.sequence_number,
+                user_id=record.user_id,
+                action=record.action,
+                resource_type=record.resource_type,
+                resource_id=record.resource_id,
+                detail=record.detail,
+                ip_address=record.ip_address,
+                created_at_iso=_normalize_dt(record.created_at),
+            )
+            if record.record_hash != expected_hash:
+                return _result(
+                    False,
+                    checked + 1,
+                    record.sequence_number,
+                    f"record_hash tampered at sequence {record.sequence_number}",
+                )
 
-        prev_hash = record.record_hash
+            prev_hash = record.record_hash
+            checked += 1
+            last_seq = record.sequence_number
 
-    return {
-        "chain_valid": True,
-        "records_checked": len(records),
-        "first_broken_sequence": None,
-        "error": None,
-    }
+    return _result(True, checked, None, None)

@@ -53,8 +53,12 @@ _CLAUDE_MODEL = "claude-haiku-4-5-20251001"  # Cost-efficient for classification
 
 
 def _check_document_access(doc: Document, current_user: User) -> None:
-    """Raise 404 if the user is not allowed to access this document."""
-    if not document_visible(doc, current_user):
+    """Raise 404 if the user may not access this document.
+
+    Documents in the trash are treated as not found too (AT-DOC-006): a
+    document the user asked to delete must not be sent to an external AI.
+    """
+    if not document_visible(doc, current_user) or doc.deletion_requested_at:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
@@ -116,6 +120,55 @@ def _get_model_name(db: Session) -> str:
     return ai_settings_service.get_model_name(db, _CLAUDE_MODEL)
 
 
+def _send_to_ai(
+    db: Session,
+    client,
+    *,
+    operation: str,
+    document_id: str,
+    user_id: str,
+    model_name: str,
+    **create_kwargs,
+) -> str:
+    """Send document text to the AI and return the response text.
+
+    Requirements §6.4 (送信ログ): the audit chain must show which document was
+    sent to the AI. Successful calls are recorded by each endpoint after the
+    result is stored; a call that fails after the request was issued is
+    recorded here as ``ai.document_<operation>_failed`` so the transmission is
+    never missing from the trail. Only metadata is logged (model, operation,
+    exception class) — never the prompt, document text or AI response.
+    """
+    try:
+        message = client.messages.create(model=model_name, **create_kwargs)
+        return message.content[0].text
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        create_chained_audit_log(
+            db,
+            user_id=user_id,
+            action=f"ai.document_{operation}_failed",
+            resource_type="document",
+            resource_id=document_id,
+            detail=json.dumps(
+                {
+                    "model": model_name,
+                    "operation": operation,
+                    "sent": True,
+                    "error_type": exc.__class__.__name__,
+                },
+                ensure_ascii=False,
+            ),
+            ip_address=None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI サービスの呼び出しに失敗しました",
+        ) from exc
+
+
 # ── Classification ─────────────────────────────────────────────────────────────
 
 _CLASSIFY_SYSTEM = """あなたは建設業の文書分類AIです。与えられた文書テキストを分析し、以下のカテゴリに分類してください。
@@ -169,14 +222,17 @@ def classify_document(
 
     prompt = f"以下の文書を分類してください:\n\n文書名: {doc.title}\n\nテキスト（最初の3000字）:\n{text[:3000]}"
 
-    message = client.messages.create(
-        model=model_name,
+    raw = _send_to_ai(
+        db,
+        client,
+        operation="classify",
+        document_id=document_id,
+        user_id=current_user.id,
+        model_name=model_name,
         max_tokens=256,
         system=_CLASSIFY_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
-
-    raw = message.content[0].text
     try:
         result = json.loads(raw)
     except json.JSONDecodeError:
@@ -290,14 +346,17 @@ def extract_document_data(
 
     prompt = f"文書名: {doc.title}\n\nテキスト:\n{text[:4000]}"
 
-    message = client.messages.create(
-        model=model_name,
+    raw = _send_to_ai(
+        db,
+        client,
+        operation="extract",
+        document_id=document_id,
+        user_id=current_user.id,
+        model_name=model_name,
         max_tokens=512,
         system=_EXTRACT_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
-
-    raw = message.content[0].text
     try:
         extracted = json.loads(raw)
     except json.JSONDecodeError:
@@ -366,14 +425,17 @@ def get_document_summary(
 
     prompt = f"文書名: {doc.title}\n\nテキスト:\n{text[:5000]}"
 
-    message = client.messages.create(
-        model=model_name,
+    summary = _send_to_ai(
+        db,
+        client,
+        operation="summary",
+        document_id=document_id,
+        user_id=current_user.id,
+        model_name=model_name,
         max_tokens=256,
         system=_SUMMARY_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
-    )
-
-    summary = message.content[0].text.strip()
+    ).strip()
     summarized_at = datetime.now(timezone.utc).isoformat()
 
     # Cache summary in extra_data
