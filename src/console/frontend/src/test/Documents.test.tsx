@@ -15,6 +15,7 @@ vi.mock("../api/documents", () => ({
   fetchDocumentBlob: vi.fn(),
 }));
 vi.mock("../api/projects", () => ({ listProjects: vi.fn() }));
+vi.mock("../api/ai", () => ({ classifyDocument: vi.fn() }));
 
 import {
   listDocumentsPaginated,
@@ -25,6 +26,7 @@ import {
   type DocumentResponse,
 } from "../api/documents";
 import { listProjects } from "../api/projects";
+import { classifyDocument } from "../api/ai";
 
 const mockDoc = {
   id: "doc-1",
@@ -417,5 +419,47 @@ describe("Documents", () => {
     expect(screen.queryByText("クリア")).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("タイトルで検索"), "test");
     expect(screen.getByText("クリア")).toBeInTheDocument();
+  });
+
+  it("AI classification dialog labels its close button and marks the result as a suggestion", async () => {
+    vi.mocked(listDocumentsPaginated).mockResolvedValue(pageOf([mockDoc]));
+    vi.mocked(listProjects).mockResolvedValue([]);
+    vi.mocked(classifyDocument).mockResolvedValueOnce({
+      document_id: "doc-1",
+      drawing_type: "平面図",
+      project_type: "橋梁",
+      confidence: 0.82,
+      tags: ["図面:平面図", "ai分類済"],
+      classified_at: "2026-10-03T00:00:00Z",
+      model: "test-model",
+    });
+    const user = userEvent.setup();
+
+    render(<Documents />, { wrapper: makeWrapper() });
+
+    await waitFor(() =>
+      expect(screen.getByText("橋梁設計図")).toBeInTheDocument(),
+    );
+    await user.click(screen.getByTitle("Claude AIで文書を分類"));
+
+    const dialog = await screen.findByRole("dialog", { name: /AI 分類結果/ });
+    expect(
+      within(dialog).getByText(
+        "AI による提案です。内容を確認し、必要に応じて修正してください。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("文書のタグ（AI 付与分を含め保存済み）"),
+    ).toBeInTheDocument();
+    // Both the "×" icon button and the footer button are announced as 閉じる.
+    const closeButtons = within(dialog).getAllByRole("button", {
+      name: "閉じる",
+    });
+    expect(closeButtons).toHaveLength(2);
+
+    await user.click(closeButtons[0]);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 });
