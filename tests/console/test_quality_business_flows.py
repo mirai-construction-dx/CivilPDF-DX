@@ -1271,3 +1271,141 @@ class TestFlattenReachesFinalized:
         assert refreshed.status == DocumentStatus.FINALIZED
         assert refreshed.is_flattened is True
         assert refreshed.flattened_hash
+
+
+class TestRevisionNumberingUnderRace:
+    """版番号の採番は競合しても一意な番号に収束する（(document_id, version_number) 一意）。"""
+
+    def test_upload_recovers_when_a_concurrent_insert_takes_the_number(
+        self, client, admin_token, db_session
+    ):
+        """SELECT と INSERT の間に他者が同じ番号を取った場合、再採番して成功する。"""
+        from models.document import DocumentVersion
+
+        project_id = _create_project(client, admin_token)
+        doc_id = _upload(client, admin_token, project_id, "採番競合")
+
+        # A concurrent upload already committed version 1. The API's max()+1 still
+        # reads 1, so its insert hits uq_document_versions_number.
+        db_session.add(
+            DocumentVersion(
+                document_id=doc_id,
+                version_number=1,
+                filename="concurrent.pdf",
+                file_size=1,
+                created_by=_admin_id(client, admin_token),
+            )
+        )
+        db_session.commit()
+
+        resp = client.post(
+            f"/api/v1/documents/{doc_id}/revisions",
+            data={"revision": "A", "revision_note": "競合テスト"},
+            files={"file": ("rev.pdf", io.BytesIO(_pdf()), "application/pdf")},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code in (200, 201), resp.text
+
+        db_session.expire_all()
+        rows = (
+            db_session.query(DocumentVersion)
+            .filter(DocumentVersion.document_id == doc_id)
+            .order_by(DocumentVersion.version_number.asc())
+            .all()
+        )
+        numbers = [v.version_number for v in rows]
+        assert numbers == [1, 2], numbers
+        # The retried row must point at stored bytes.
+        assert rows[1].file_path, "再採番された版の実体が保存されていない"
+
+
+class TestIndexXmlCarriesRevisionAndIso19650:
+    """INDEX.XML が版と ISO 19650 メタデータを成果品情報に含める。"""
+
+    def _documents(self, project_id: str, owner_id: str) -> list:
+        from models.document import Document, DocumentType
+
+        return [
+            Document(
+                title="平面図",
+                filename="plan.pdf",
+                file_size=len(_pdf()),
+                document_type=DocumentType.DRAWING,
+                status=DocumentStatus.APPROVED,
+                project_id=project_id,
+                owner_id=owner_id,
+                revision="A3",
+                revision_note="数量表修正",
+                iso19650_originator="ABC",
+                iso19650_functional_breakdown="00",
+                iso19650_form="DR",
+                iso19650_discipline="ST",
+                iso19650_number="0001",
+                tags=[],
+                extra_data={},
+            )
+        ]
+
+    def test_index_xml_includes_revision_and_iso_fields(self, db_session, admin_user):
+        from models.user import Project
+
+        project = Project(name="QA納品版", code=f"QA-IDX-{uuid.uuid4().hex[:6]}")
+        db_session.add(project)
+        db_session.flush()
+        documents = self._documents(project.id, admin_user.id)
+        for doc in documents:
+            db_session.add(doc)
+        db_session.commit()
+
+        payload = generate_delivery_zip(
+            project,
+            documents,
+            generated_at=datetime(2026, 10, 10, tzinfo=timezone.utc),
+        )
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            index_entry = next(n for n in archive.namelist() if n.endswith("INDEX.XML"))
+            index_xml = archive.read(index_entry).decode("utf-8")
+
+        assert "<版>A3</版>" in index_xml, index_xml
+        assert "平面図（A3）" in index_xml, index_xml
+        assert "<ISO19650情報>" in index_xml, index_xml
+        assert "<作成者コード>ABC</作成者コード>" in index_xml
+        assert "<分野コード>ST</分野コード>" in index_xml
+        assert "<連番>0001</連番>" in index_xml
+
+    def test_index_xml_stays_unchanged_without_iso_metadata(
+        self, db_session, admin_user
+    ):
+        """ISO 19650 情報が無い文書では ISO19650情報 要素を作らない。"""
+        from models.document import Document, DocumentType
+        from models.user import Project
+
+        project = Project(name="QA納品素", code=f"QA-IDX-{uuid.uuid4().hex[:6]}")
+        db_session.add(project)
+        db_session.flush()
+        doc = Document(
+            title="報告書",
+            filename="report.pdf",
+            file_size=len(_pdf()),
+            document_type=DocumentType.REPORT,
+            status=DocumentStatus.APPROVED,
+            project_id=project.id,
+            owner_id=admin_user.id,
+            tags=[],
+            extra_data={},
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        payload = generate_delivery_zip(
+            project,
+            [doc],
+            generated_at=datetime(2026, 10, 10, tzinfo=timezone.utc),
+        )
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            index_entry = next(n for n in archive.namelist() if n.endswith("INDEX.XML"))
+            index_xml = archive.read(index_entry).decode("utf-8")
+
+        assert "<ISO19650情報>" not in index_xml, index_xml
+        assert "<版 />" in index_xml, index_xml
+        assert "報告書" in index_xml
