@@ -3,9 +3,18 @@ import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.schemas import RevisionResponse
@@ -18,6 +27,9 @@ from services.audit_chain_service import create_chained_audit_log
 from services.access_control import assert_document_visible
 
 router = APIRouter(prefix="/documents", tags=["Revisions"])
+
+# How many times to re-read max(version_number) after a uniqueness conflict.
+_MAX_NUMBER_ATTEMPTS = 3
 
 
 def _require_manager(user: User) -> None:
@@ -49,34 +61,53 @@ async def upload_revision(
             detail=f"File size exceeds {settings.max_file_size_mb}MB limit",
         )
     file_size = len(content)
-    max_version = (
-        db.query(func.max(DocumentVersion.version_number))
-        .filter(DocumentVersion.document_id == doc_id)
-        .scalar()
-    )
-    next_version = (max_version or 0) + 1
 
-    # Persist the revision bytes. Without them a "version" is metadata only and
-    # the old revision can never be retrieved (WEB-DOC-003 旧版参照).
+    # Persist the revision bytes first: without them a "version" is metadata only
+    # and the old revision can never be retrieved (WEB-DOC-003 旧版参照).
     version_dir = Path(settings.upload_dir) / doc_id / "revisions"
     version_dir.mkdir(parents=True, exist_ok=True)
-    version_path = version_dir / f"v{next_version:04d}-{uuid.uuid4().hex[:8]}.pdf"
-    version_path.write_bytes(content)
 
-    version = DocumentVersion(
-        document_id=doc_id,
-        version_number=next_version,
-        filename=file.filename,
-        file_path=str(version_path),
-        file_size=file_size,
-        created_by=current_user.id,
-        revision=revision,
-        revision_note=revision_note,
-        is_from_editor=is_from_editor,
-        editor_session_id=editor_session_id,
-    )
-    db.add(version)
-    db.flush()
+    version: DocumentVersion | None = None
+    for attempt in range(_MAX_NUMBER_ATTEMPTS):
+        max_version = (
+            db.query(func.max(DocumentVersion.version_number))
+            .filter(DocumentVersion.document_id == doc_id)
+            .scalar()
+        )
+        candidate = (max_version or 0) + 1
+        version_path = version_dir / f"v{candidate:04d}-{uuid.uuid4().hex[:8]}.pdf"
+        version_path.write_bytes(content)
+        candidate_row = DocumentVersion(
+            document_id=doc_id,
+            version_number=candidate,
+            filename=file.filename,
+            file_path=str(version_path),
+            file_size=file_size,
+            created_by=current_user.id,
+            revision=revision,
+            revision_note=revision_note,
+            is_from_editor=is_from_editor,
+            editor_session_id=editor_session_id,
+        )
+        db.add(candidate_row)
+        try:
+            db.flush()
+        except IntegrityError:
+            # Another upload took this number between our SELECT and INSERT
+            # (uq_document_versions_number). Roll back to the savepoint, drop the
+            # orphan file and re-read the maximum.
+            db.rollback()
+            version_path.unlink(missing_ok=True)
+            if attempt == _MAX_NUMBER_ATTEMPTS - 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Revision numbering conflicted; retry the upload",
+                ) from None
+            continue
+        version = candidate_row
+        break
+
+    assert version is not None  # the loop either assigns or raises
     db.refresh(version)
     create_chained_audit_log(
         db,
@@ -84,7 +115,9 @@ async def upload_revision(
         action="document.revision.uploaded",
         resource_type="document",
         resource_id=doc_id,
-        detail=json.dumps({"version_number": next_version, "revision": revision}),
+        detail=json.dumps(
+            {"version_number": version.version_number, "revision": revision}
+        ),
         ip_address=None,
     )
     db.refresh(version)

@@ -146,13 +146,46 @@ def _build_index_xml(
         for i, doc in enumerate(docs, start=1):
             file_el = ET.SubElement(folder_el, "ファイル情報")
             _sub(file_el, "ファイル名", f"{prefix}_{i:04d}.PDF")
-            _sub(file_el, "タイトル", doc.title)
+            _sub(file_el, "タイトル", _document_title(doc))
             _sub(file_el, "ファイルサイズ", str(packaged_size.get(doc.id, 0)))
             _sub(file_el, "PDF_A準拠", "1" if doc.is_pdfa else "0")
+            _sub(file_el, "版", doc.revision or "")
+            iso = _iso19650_metadata(doc)
+            if iso:
+                iso_el = ET.SubElement(file_el, "ISO19650情報")
+                for tag, value in iso.items():
+                    _sub(iso_el, tag, value)
 
     declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_body = ET.tostring(root, encoding="unicode")
     return (declaration + xml_body).encode("utf-8")
+
+
+def _document_title(doc: Document) -> str:
+    """Title as it appears in INDEX.XML, carrying the revision label.
+
+    The 版 element is authoritative; repeating the label in the title keeps the
+    revision visible in viewers that only show INDEX.XML titles.
+    """
+    if doc.revision:
+        return f"{doc.title}（{doc.revision}）"
+    return doc.title
+
+
+def _iso19650_metadata(doc: Document) -> dict[str, str]:
+    """ISO 19650 naming fields present on the document, in a stable order.
+
+    Only non-empty fields are emitted, so a package whose documents carry no ISO
+    19650 metadata stays byte-identical to the previous format.
+    """
+    fields = (
+        ("作成者コード", doc.iso19650_originator),
+        ("機能分類", doc.iso19650_functional_breakdown),
+        ("情報形式", doc.iso19650_form),
+        ("分野コード", doc.iso19650_discipline),
+        ("連番", doc.iso19650_number),
+    )
+    return {tag: str(value) for tag, value in fields if value}
 
 
 def _group_by_folder(documents: list[Document]) -> dict[str, list[Document]]:
