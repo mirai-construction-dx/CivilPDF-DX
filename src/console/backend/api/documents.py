@@ -65,6 +65,20 @@ def _ensure_pdf_content(first_chunk: bytes) -> bool:
     return first_chunk.startswith(b"%PDF-")
 
 
+def _assert_can_modify_document(doc: Document, user: User) -> None:
+    """Raise 403 unless the user may change or remove this document.
+
+    Visibility (``assert_document_visible``) only answers "may this user see
+    it". Every state-changing document endpoint must additionally require the
+    owner, a manager or an admin — otherwise any project member could archive,
+    restore or re-type somebody else's document.
+    """
+    if doc.owner_id != user.id and user.role.value not in ("admin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+
 @router.get("/", response_model=None)
 def list_documents(
     project_id: Optional[str] = Query(None),
@@ -369,13 +383,7 @@ def update_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
-    if doc.owner_id != current_user.id and current_user.role.value not in (
-        "admin",
-        "manager",
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
+    _assert_can_modify_document(doc, current_user)
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(doc, field, value)
@@ -465,13 +473,7 @@ async def apply_timestamp(
     """Apply RFC 3161 timestamp to an existing document (電子帳簿保存法・e-文書法)."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
-    if doc.owner_id != current_user.id and current_user.role.value not in (
-        "admin",
-        "manager",
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
+    _assert_can_modify_document(doc, current_user)
     if not doc.file_path or not Path(doc.file_path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
@@ -554,6 +556,7 @@ def delete_document(
 ):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_can_modify_document(doc, current_user)
 
     # Soft delete: retention/GDPR requires a grace period before physical
     # removal. The background deletion job performs the physical erasure.
@@ -582,6 +585,7 @@ def restore_document(
     """Restore a soft-deleted document (ごみ箱から復元)."""
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
+    _assert_can_modify_document(doc, current_user)
     if doc.deletion_requested_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

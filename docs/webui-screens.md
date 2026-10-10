@@ -56,8 +56,9 @@ Enterprise シェルは URL ベースのルートではなく、内部ステー�
 
 ### 承認ワークフロー（`workflow`）
 
-- `pages/Workflows.tsx`。一覧・詳細・ステップ承認/却下を提供します。
-- 利用 API: `GET/POST /api/v1/workflows/...`、`POST /api/v1/workflows/{id}/steps/{sid}/decide`。
+- `pages/Workflows.tsx`。一覧・詳細・ステップ承認/却下/差戻し・差戻し後の再申請を提供します。
+- 利用 API: `GET/POST /api/v1/workflows/...`、`POST /api/v1/workflows/{id}/steps/{sid}/decide`（`approve` / `reject` / `return`）、`POST /api/v1/workflows/{id}/resubmit`。
+- 「再申請」は admin、または `GET /api/v1/documents/{id}` で取得した文書の所有者にのみ表示します（バックエンドでも同じ条件で強制）。
 
 ### 監査（`audit`）
 

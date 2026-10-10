@@ -1,11 +1,15 @@
 import json
+import uuid
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.schemas import RevisionResponse
+from config import settings
 from auth.dependencies import get_current_user
 from database import get_db
 from models.document import Document, DocumentVersion
@@ -38,8 +42,6 @@ async def upload_revision(
     content = await file.read()
     if not content.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="File content is not a valid PDF")
-    from config import settings
-
     max_bytes = settings.max_file_size_mb * 1024 * 1024
     if len(content) > max_bytes:
         raise HTTPException(
@@ -53,10 +55,19 @@ async def upload_revision(
         .scalar()
     )
     next_version = (max_version or 0) + 1
+
+    # Persist the revision bytes. Without them a "version" is metadata only and
+    # the old revision can never be retrieved (WEB-DOC-003 旧版参照).
+    version_dir = Path(settings.upload_dir) / doc_id / "revisions"
+    version_dir.mkdir(parents=True, exist_ok=True)
+    version_path = version_dir / f"v{next_version:04d}-{uuid.uuid4().hex[:8]}.pdf"
+    version_path.write_bytes(content)
+
     version = DocumentVersion(
         document_id=doc_id,
         version_number=next_version,
         filename=file.filename,
+        file_path=str(version_path),
         file_size=file_size,
         created_by=current_user.id,
         revision=revision,
@@ -95,3 +106,40 @@ def list_revisions(
         .all()
     )
     return [RevisionResponse.model_validate(v) for v in versions]
+
+
+@router.get("/{doc_id}/revisions/{version_number}/download")
+def download_revision(
+    doc_id: str,
+    version_number: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the stored bytes of one revision (旧版参照).
+
+    Revisions written before the bytes started being persisted have no
+    ``file_path``; those respond 410 so the caller can tell "never stored"
+    apart from "not found".
+    """
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    assert_document_visible(doc, current_user)
+    version = (
+        db.query(DocumentVersion)
+        .filter(
+            DocumentVersion.document_id == doc_id,
+            DocumentVersion.version_number == version_number,
+        )
+        .first()
+    )
+    if not version:
+        raise HTTPException(status_code=404, detail="Revision not found")
+    if not version.file_path or not Path(version.file_path).exists():
+        raise HTTPException(
+            status_code=410,
+            detail="Revision content was not stored for this version",
+        )
+    return FileResponse(
+        version.file_path,
+        media_type="application/pdf",
+        filename=version.filename or f"revision-{version_number}.pdf",
+    )
