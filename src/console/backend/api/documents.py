@@ -385,6 +385,22 @@ def update_document(
     assert_document_visible(doc, current_user)
     _assert_can_modify_document(doc, current_user)
 
+    # The document type decides the electronic-delivery folder and file prefix
+    # (services/electronic_delivery_service.py _FOLDER_MAP). Once a document is
+    # approved, re-typing it would silently change what a past delivery
+    # contained, so that change has to go through the approval flow instead.
+    if body.document_type is not None and doc.status in (
+        DocumentStatus.APPROVED,
+        DocumentStatus.FINALIZED,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Document type is fixed after approval; return the document "
+                "through the approval workflow to re-type it"
+            ),
+        )
+
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(doc, field, value)
     db.commit()

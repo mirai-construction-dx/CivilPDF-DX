@@ -45,6 +45,31 @@ def _pdf() -> bytes:
     return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n%%EOF"
 
 
+def _parseable_pdf() -> bytes:
+    """Minimal PDF with a valid xref table so pypdf can open it."""
+    header = b"%PDF-1.4\n"
+    obj1 = b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    obj2 = b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+    obj3 = b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n"
+    body = header + obj1 + obj2 + obj3
+    offsets = [
+        0,
+        len(header),
+        len(header) + len(obj1),
+        len(header) + len(obj1) + len(obj2),
+    ]
+    xref_offset = len(body)
+    xref = b"xref\n0 4\n0000000000 65535 f \n" + b"".join(
+        f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:]
+    )
+    trailer = (
+        b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n"
+        + str(xref_offset).encode()
+        + b"\n%%EOF\n"
+    )
+    return body + xref + trailer
+
+
 def _create_project(client, admin_token, code: str | None = None) -> str:
     resp = client.post(
         "/api/v1/projects/",
@@ -158,16 +183,22 @@ class TestDocumentApprovalLifecycle:
         _approve_fully(client, admin_token, doc_id)
         assert _status(client, engineer_token, doc_id) == "approved"
 
-        # The owner may re-type their own document even after approval
-        # (api/documents.py:372-378 = owner OR admin OR manager).
+        # 承認後は所有者でも種別を変えられない（納品フォルダが変わるため）。
         resp = client.patch(
             f"/api/v1/documents/{doc_id}",
             json={"document_type": "photo"},
             headers={"Authorization": f"Bearer {engineer_token}"},
         )
+        assert resp.status_code == 409, resp.text
+
+        # 所有者による title の訂正は承認後も可能（承認状態は変わらない）。
+        resp = client.patch(
+            f"/api/v1/documents/{doc_id}",
+            json={"title": "承認対象図面（改題）"},
+            headers={"Authorization": f"Bearer {engineer_token}"},
+        )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["document_type"] == "photo"
-        # 種別の変更は承認状態を書き換えない（承認は承認フローの所管）。
+        assert resp.json()["title"] == "承認対象図面（改題）"
         assert resp.json()["status"] == "approved"
 
     def test_non_owner_member_cannot_retype_someone_elses_document(
@@ -991,3 +1022,252 @@ class TestVersionNumberUniqueness:
             files={"file": ("rev.pdf", io.BytesIO(_pdf()), "application/pdf")},
             headers={"Authorization": f"Bearer {token}"},
         )
+
+
+# ── 8. 承認後の変更統制（第2バッチ） ─────────────────────────────────────────
+
+
+_SIDECAR = {
+    "schema": "civilpdf.review/v1",
+    "generator": "CivilPDF-Editor",
+    "savedAt": "2026-06-21T10:05:00Z",
+    "stamps": [{"id": "s1", "page": 1, "status": "approved"}],
+    "annotations": [],
+}
+
+
+class TestApprovedDocumentImmutability:
+    """承認済み文書は納品物と承認記録の基準になるため、後から書き換えられない。"""
+
+    def test_document_type_is_fixed_after_approval(self, client, admin_token):
+        """承認後に種別を変えようとすると 409（納品フォルダが変わるため）。
+
+        `_FOLDER_MAP` が DocumentType から納品先フォルダと接頭辞を決めるので、
+        承認後の種別変更は「過去に納品した中身」を書き換えるのと同じ意味を持つ。
+        """
+        project_id = _create_project(client, admin_token)
+        doc_id = _upload(client, admin_token, project_id, "承認済み図面")
+        _approve_fully(client, admin_token, doc_id)
+
+        blocked = client.patch(
+            f"/api/v1/documents/{doc_id}",
+            json={"document_type": "photo"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert blocked.status_code == 409, blocked.text
+        # 種別が変わっていないこと
+        assert (
+            client.get(
+                f"/api/v1/documents/{doc_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            ).json()["document_type"]
+            != "photo"
+        )
+
+        # 承認後でも title の訂正（誤字等）は妨げない
+        renamed = client.patch(
+            f"/api/v1/documents/{doc_id}",
+            json={"title": "承認済み図面（改題）"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert renamed.status_code == 200, renamed.text
+
+    def test_review_sidecar_import_is_blocked_after_approval(
+        self, client, admin_token, db_session, admin_user
+    ):
+        """承認済み文書への sidecar 取込は 409（status を巻き戻させない）。
+
+        `api/editor.py` は sidecar 取込で `doc.status` を EDITOR_DRAFT /
+        EDITOR_REVIEWED に上書きする。承認済み文書でこれを許すと、承認記録は
+        approved のまま文書だけが下書きに戻る不整合が生じる。
+        """
+        from models.document import Document
+        from models.user import Project
+
+        project = Project(name="QA承認後", code=f"QA-APR-{uuid.uuid4().hex[:6]}")
+        db_session.add(project)
+        db_session.flush()
+        doc = Document(
+            title="承認済み（sidecar）",
+            filename="approved.pdf",
+            file_size=len(_pdf()),
+            status=DocumentStatus.APPROVED,
+            project_id=project.id,
+            owner_id=admin_user.id,
+            tags=[],
+            extra_data={},
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        resp = client.post(
+            f"/api/v1/documents/{doc.id}/review-sidecar",
+            json=_SIDECAR,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 409, resp.text
+        db_session.expire_all()
+        assert (
+            db_session.query(Document).filter(Document.id == doc.id).first().status
+            == DocumentStatus.APPROVED
+        )
+
+    def test_review_sidecar_still_works_before_approval(
+        self, client, admin_token, db_session, admin_user
+    ):
+        """未承認（draft）の文書では sidecar 取込は従来どおり動く。"""
+        from models.document import Document
+        from models.user import Project
+
+        project = Project(name="QA下書き", code=f"QA-DRF-{uuid.uuid4().hex[:6]}")
+        db_session.add(project)
+        db_session.flush()
+        doc = Document(
+            title="下書き（sidecar）",
+            filename="draft.pdf",
+            file_size=len(_pdf()),
+            status=DocumentStatus.DRAFT,
+            project_id=project.id,
+            owner_id=admin_user.id,
+            tags=[],
+            extra_data={},
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        resp = client.post(
+            f"/api/v1/documents/{doc.id}/review-sidecar",
+            json=_SIDECAR,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code in (200, 201), resp.text
+
+
+class TestSuspendedAccount:
+    """WEB-USER-003: suspended は inactive と同様に認証・操作を拒否する。"""
+
+    def test_suspended_user_cannot_authenticate(self, client, admin_token, db_session):
+        from auth.jwt import get_password_hash
+        from models.user import User, UserRole, UserStatus
+
+        user = User(
+            email=f"susp-{uuid.uuid4().hex[:8]}@example.com",
+            username=f"susp-{uuid.uuid4().hex[:8]}",
+            full_name="Suspended QA",
+            hashed_password=get_password_hash("Suspended123!"),
+            role=UserRole.ENGINEER,
+            status=UserStatus.SUSPENDED,
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        resp = client.post(
+            "/api/v1/auth/token",
+            data={"username": user.email, "password": "Suspended123!"},
+        )
+        assert resp.status_code in (401, 403), resp.text
+
+    def test_suspended_user_token_is_rejected(self, client, admin_token, db_session):
+        """既に発行済みのトークンでも、停止後は 403 になる。"""
+        from auth.jwt import create_access_token, get_password_hash
+        from models.user import User, UserRole, UserStatus
+
+        user = User(
+            email=f"susp2-{uuid.uuid4().hex[:8]}@example.com",
+            username=f"susp2-{uuid.uuid4().hex[:8]}",
+            full_name="Suspended QA 2",
+            hashed_password=get_password_hash("Suspended123!"),
+            role=UserRole.ENGINEER,
+            status=UserStatus.ACTIVE,
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        token = create_access_token(
+            {"sub": user.id, "email": user.email, "role": user.role.value}
+        )
+        assert (
+            client.get(
+                "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+            ).status_code
+            == 200
+        )
+
+        user.status = UserStatus.SUSPENDED
+        db_session.commit()
+        resp = client.get(
+            "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 403, resp.text
+
+
+class TestDuplicateApproverIsAcceptedAsConfigured:
+    """WEB-WF-001: 同一人物を複数ステップに指定できる（現行仕様の記録）。"""
+
+    def test_same_user_can_hold_two_steps(self, client, admin_token):
+        """現在は重複を検査しない。多段統制の実効性は運用側の判断事項。
+
+        実装は `approver_ids` の重複を弾かないため、1 人で全ステップを承認でき
+        多段承認が形骸化し得る。ここでは現状を固定し、仕様判断が必要な点として
+        残す（禁止にするなら 400 を返す実装変更が必要）。
+        """
+        project_id = _create_project(client, admin_token)
+        doc_id = _upload(client, admin_token, project_id, "多重ステップ")
+        admin = _admin_id(client, admin_token)
+        created = client.post(
+            "/api/v1/workflows/",
+            json={"document_id": doc_id, "approver_ids": [admin, admin]},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert created.status_code == 201, created.text
+        steps = created.json()["steps"]
+        assert len(steps) == 2
+        assert len({step["approver_id"] for step in steps}) == 1, (
+            "重複が拒否されるようになった場合は実装が変わったので、このテストを"
+            "409/400 の期待へ更新すること"
+        )
+
+
+class TestFlattenReachesFinalized:
+    """Editor 連携: flatten チェック成功で FINALIZED に到達する（確定状態）。"""
+
+    def test_successful_flatten_marks_document_finalized(
+        self, client, admin_token, db_session, admin_user
+    ):
+        from models.document import Document
+        from models.user import Project
+
+        project = Project(name="QA確定", code=f"QA-FIN-{uuid.uuid4().hex[:6]}")
+        db_session.add(project)
+        db_session.flush()
+        pdf_path = (
+            __import__("pathlib").Path(
+                __import__("tempfile").mkdtemp(prefix="qa-flatten-")
+            )
+            / "flat.pdf"
+        )
+        pdf_path.write_bytes(_parseable_pdf())
+        doc = Document(
+            title="平坦化対象",
+            filename="flat.pdf",
+            file_path=str(pdf_path),
+            file_size=len(_parseable_pdf()),
+            status=DocumentStatus.EDITOR_REVIEWED,
+            project_id=project.id,
+            owner_id=admin_user.id,
+            tags=[],
+            extra_data={},
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        resp = client.post(
+            f"/api/v1/documents/{doc.id}/flatten-check",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        db_session.expire_all()
+        refreshed = db_session.query(Document).filter(Document.id == doc.id).first()
+        assert refreshed.status == DocumentStatus.FINALIZED
+        assert refreshed.is_flattened is True
+        assert refreshed.flattened_hash

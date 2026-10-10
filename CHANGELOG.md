@@ -18,6 +18,14 @@
   - **DB migration は不要**（新カラム・新 enum 値なし）。仕様と決定の根拠: [docs/architecture/workflow-return-resubmit-design.md](docs/architecture/workflow-return-resubmit-design.md)
   - 制限: 先行ステップが承認済みの場合の巻き戻し（任意ステップへの差戻し）は未対応。該当操作は 409
 
+### 修正・強化（2026-10-10 品質テスト第2バッチ）
+
+- 🔒 **承認済み文書の種別を固定**。文書種別は電子納品のフォルダと接頭辞を決めるため、承認後に書き換えると「過去に納品した中身」が変わる。`APPROVED` / `FINALIZED` の文書で種別を変更しようとすると 409（タイトルの訂正は引き続き可能）
+- 📥 **承認済み文書へのレビュー sidecar 取込を拒否（409）**。`api/editor.py` は取込時に文書 status を `EDITOR_DRAFT` / `EDITOR_REVIEWED` に上書きするため、承認記録（approved）と文書状態が乖離し得た
+- 🔑 **`suspended` アカウントの取扱いをテストで固定**。ログイン不可と、発行済みトークンの失効後 403 を検証
+- 🧪 品質テストを 25 → 32 件へ拡充（承認後の変更統制、sidecar 取込の可否、suspended、flatten の `FINALIZED` 到達、多重ステップの現行仕様の記録）
+- 🛠️ `AGENTS.md` に CI 相当のジョブ表を追記（migration・pip-audit・npm audit・E2E・Windows・shellcheck・gitleaks とローカル代替）
+
 ### 修正・強化（2026-10-10 品質テスト第1バッチ）
 
 - 🔐 **文書の削除・復元に所有者/ロール判定を追加**。従来は可視性（プロジェクトメンバー）だけで判定していたため、メンバーであれば viewer/engineer でも他者の文書をアーカイブ・復元できた。`update_document` / `apply_timestamp` と同じ「owner または admin/manager」に統一（判定は `_assert_can_modify_document` に集約）
