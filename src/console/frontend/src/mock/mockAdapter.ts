@@ -348,6 +348,11 @@ function handle(config: InternalAxiosRequestConfig): unknown {
     if (idx >= 0) mockDocuments.splice(idx, 1);
     return null;
   }
+  if (m && method === "get") {
+    const doc = mockDocuments.find((d) => d.id === m![1]);
+    if (!doc) notFound(config, path);
+    return doc;
+  }
   m = path.match(/^\/documents\/([^/]+)\/download$/);
   if (m && method === "get") return mockPdfBlob();
   m = path.match(/^\/documents\/([^/]+)\/timestamp$/);
@@ -462,27 +467,94 @@ function handle(config: InternalAxiosRequestConfig): unknown {
   }
   m = path.match(/^\/workflows\/([^/]+)\/steps\/([^/]+)\/decide$/);
   if (m && method === "post") {
+    // body の検証は backend では Pydantic がハンドラ前に実行するため、
+    // 422（不正 decision）は 404（不在 wf/step）より先に返る。
+    if (
+      body.decision !== "approve" &&
+      body.decision !== "reject" &&
+      body.decision !== "return"
+    ) {
+      httpError(
+        config,
+        422,
+        `Invalid decision: ${String(body.decision)} (expected approve|reject|return)`,
+      );
+    }
+    const decision = body.decision as "approve" | "reject" | "return";
     const wf = mockWorkflows.find((w) => w.id === m![1]);
     if (!wf) notFound(config, path);
     const step = wf!.steps.find((s) => s.id === m![2]);
     if (!step) notFound(config, path);
-    if (body.decision !== "approve" && body.decision !== "reject") {
+    // 二重決定の禁止（backend と同じ契約・同じ順序: 404 → 409 二重決定 → 409 差戻し中）。
+    if (step!.status !== "pending") {
+      httpError(config, 409, "Step already decided");
+    }
+    // 差戻し中は再申請するまで decide を受け付けない（backend と同じ契約）。
+    if (wf!.status === "returned") {
       httpError(
         config,
-        422,
-        `Invalid decision: ${String(body.decision)} (expected approve|reject)`,
+        409,
+        "Workflow was returned; resubmit it before deciding steps",
       );
     }
-    step!.status = body.decision === "approve" ? "approved" : "rejected";
+    // 承認順序の強制（backend と同じ契約・同じ相対順序）。
+    // approve/reject は先行ステップが全て approved であること、
+    // return は先行ステップに approved が無いことを要求する。
+    const previousSteps = wf!.steps.filter((s) => s.order < step!.order);
+    if (
+      decision !== "return" &&
+      previousSteps.some((s) => s.status !== "approved")
+    ) {
+      httpError(config, 409, "Previous approval steps must be approved first");
+    }
+    if (
+      decision === "return" &&
+      previousSteps.some((s) => s.status === "approved")
+    ) {
+      httpError(
+        config,
+        409,
+        "Cannot return a step after a previous step was approved",
+      );
+    }
+    step!.status =
+      decision === "approve"
+        ? "approved"
+        : decision === "reject"
+          ? "rejected"
+          : "returned";
     step!.comment = (body.comment as string | undefined) ?? null;
     step!.decided_at = nowIso();
-    if (body.decision === "reject") {
+    if (decision === "reject") {
       wf!.status = "rejected";
       wf!.completed_at = nowIso();
+    } else if (decision === "return") {
+      wf!.status = "returned";
+      wf!.completed_at = null;
+      const doc = mockDocuments.find((d) => d.id === wf!.document_id);
+      if (doc) doc.status = "draft";
     } else if (wf!.steps.every((s) => s.status === "approved")) {
       wf!.status = "approved";
       wf!.completed_at = nowIso();
     }
+    return wf;
+  }
+  m = path.match(/^\/workflows\/([^/]+)\/resubmit$/);
+  if (m && method === "post") {
+    const wf = mockWorkflows.find((w) => w.id === m![1]);
+    if (!wf) notFound(config, path);
+    if (wf!.status !== "returned") {
+      httpError(config, 409, "Only a returned workflow can be resubmitted");
+    }
+    for (const s of wf!.steps) {
+      s.status = "pending";
+      s.comment = null;
+      s.decided_at = null;
+    }
+    wf!.status = "in_progress";
+    wf!.completed_at = null;
+    const doc = mockDocuments.find((d) => d.id === wf!.document_id);
+    if (doc) doc.status = "pending_review";
     return wf;
   }
 
