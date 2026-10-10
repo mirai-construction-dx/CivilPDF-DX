@@ -309,7 +309,12 @@ def search_documents(
             or 0
         )
     else:
-        fts_count = db.execute(text("SELECT COUNT(*) FROM documents_fts")).scalar() or 0
+        # COUNT(rowid) lets SQLite answer from the FTS5 index instead of scanning
+        # the whole table; the rows are keyed by the document id, so the count is
+        # the same value the previous COUNT(*) produced.
+        fts_count = (
+            db.execute(text("SELECT COUNT(rowid) FROM documents_fts")).scalar() or 0
+        )
     doc_count = db.query(Document).count()
     if fts_count != doc_count:
         _rebuild_fts_index(db)

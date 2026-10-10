@@ -1409,3 +1409,132 @@ class TestIndexXmlCarriesRevisionAndIso19650:
         assert "<ISO19650情報>" not in index_xml, index_xml
         assert "<版 />" in index_xml, index_xml
         assert "報告書" in index_xml
+
+
+class TestCriticalConfigChangesAreAudited:
+    """設定変更（AI 有効化・API キー・M365 資格情報）が改ざん検知対象に残る。"""
+
+    def test_ai_config_update_is_chained_and_never_records_the_key(
+        self, client, admin_token, db_session
+    ):
+        from models.audit_log import AuditLog
+
+        secret = "sk-ant-qa-should-never-be-logged"
+        resp = client.put(
+            "/api/v1/ai-config",
+            json={"enabled": True, "model_name": "claude-qa", "api_key": secret},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        db_session.expire_all()
+        entry = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "ai.config.updated")
+            .order_by(AuditLog.created_at.desc())
+            .first()
+        )
+        assert entry is not None, "AI 設定変更が監査に記録されていない"
+        assert entry.sequence_number is not None, "未連鎖の行として記録されている"
+        detail = entry.detail or ""
+        assert secret not in detail, "API キーの値が監査ログに記録されている"
+        assert '"api_key_changed": true' in detail, detail
+        assert '"enabled": true' in detail, detail
+
+    def test_m365_config_update_is_chained_and_never_records_the_secret(
+        self, client, admin_token, db_session
+    ):
+        from models.audit_log import AuditLog
+
+        secret = "qa-client-secret-never-logged"
+        resp = client.put(
+            "/api/v1/m365/config",
+            json={
+                "tenant_id": "qa-tenant",
+                "client_id": "qa-client",
+                "client_secret": secret,
+                "enabled": True,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        db_session.expire_all()
+        entry = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "m365.config.updated")
+            .order_by(AuditLog.created_at.desc())
+            .first()
+        )
+        assert entry is not None, "M365 設定変更が監査に記録されていない"
+        assert entry.sequence_number is not None, "未連鎖の行として記録されている"
+        detail = entry.detail or ""
+        assert (
+            secret not in detail
+        ), "クライアントシークレットが監査ログに記録されている"
+        assert '"client_secret_changed": true' in detail, detail
+
+
+class TestAuditChainReportsUnchainedRows:
+    """verify_chain は「連鎖していない行」を隠さず件数で返す。"""
+
+    def test_unchained_rows_are_counted(self, client, admin_token, db_session):
+        from models.audit_log import AuditLog
+
+        project_id = _create_project(client, admin_token)
+        doc_id = _upload(client, admin_token, project_id, "未連鎖の検出")
+        _approve_fully(client, admin_token, doc_id)
+
+        before = client.get(
+            "/api/v1/audit-logs/verify",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ).json()
+        assert before["chain_valid"] is True
+        assert before["unchained_records"] == 0, before
+
+        # A row that never entered the chain (legacy shape) must be visible.
+        db_session.add(
+            AuditLog(
+                user_id=None,
+                action="legacy.unlinked",
+                resource_type="auth",
+                detail="{}",
+                ip_address=None,
+            )
+        )
+        db_session.commit()
+
+        after = client.get(
+            "/api/v1/audit-logs/verify",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ).json()
+        assert after["chain_valid"] is True, "連鎖行そのものは壊れていない"
+        assert after["unchained_records"] == 1, after
+
+
+class TestSsoLoginsEnterTheHashChain:
+    """SSO（M365/OIDC）の認証行がハッシュチェーンに入る。"""
+
+    def test_m365_login_failure_is_chained(self, client, admin_token, db_session):
+        from models.audit_log import AuditLog
+
+        resp = client.post(
+            "/api/v1/auth/m365/login",
+            json={"email": "qa-chain@example.com"},
+        )
+        # The bridge is deny-by-default for networks it cannot verify; either way
+        # the attempt is recorded (409/403/503 are all "not logged in").
+        assert resp.status_code != 200, resp.text
+
+        db_session.expire_all()
+        rows = db_session.query(AuditLog).filter(AuditLog.action.like("m365_%")).all()
+        assert rows, "M365 ログイン試行が監査に記録されていない"
+        assert all(
+            row.sequence_number is not None for row in rows
+        ), "M365 認証行が未連鎖のまま記録されている"
+
+        verified = client.get(
+            "/api/v1/audit-logs/verify",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ).json()
+        assert verified["chain_valid"] is True, verified

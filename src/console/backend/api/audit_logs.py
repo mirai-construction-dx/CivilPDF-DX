@@ -165,6 +165,9 @@ class ChainVerifyResponse(BaseModel):
     chain_valid: bool
     records_checked: int
     first_broken_sequence: Optional[int]
+    # Rows with no sequence_number: outside the chain, reported so a green
+    # chain_valid never hides an unverified range of the audit log.
+    unchained_records: int = 0
     error: Optional[str]
 
 

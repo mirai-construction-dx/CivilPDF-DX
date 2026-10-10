@@ -1,5 +1,6 @@
 """Shared test fixtures for console API tests."""
 
+import base64
 import shutil
 import sys
 import os
@@ -11,6 +12,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src/console/ba
 # strong test secrets when the app is imported with DEBUG=false.
 os.environ.setdefault("SECRET_KEY", "unit-test-secret-key-value-32bytes-minimum")
 os.environ.setdefault("TIMESTAMP_HMAC_KEY", "unit-test-hmac-key-value-32bytes-minimum")
+# Fernet key for the AI API key / M365 client secret encryption paths. A fixed
+# test-only key: the real one lives in the deployed .env and is never committed.
+os.environ.setdefault(
+    "M365_FERNET_KEY",
+    base64.urlsafe_b64encode(b"unit-test-fernet-key-32-bytes!!!").decode(),
+)
 
 # Keep uploads out of the deployed storage location. config.upload_dir defaults
 # to ~/civildx/uploads, which on this host is the *production* upload directory,

@@ -18,6 +18,15 @@
   - **DB migration は不要**（新カラム・新 enum 値なし）。仕様と決定の根拠: [docs/architecture/workflow-return-resubmit-design.md](docs/architecture/workflow-return-resubmit-design.md)
   - 制限: 先行ステップが承認済みの場合の巻き戻し（任意ステップへの差戻し）は未対応。該当操作は 409
 
+### 修正・強化（2026-10-10 品質テスト第4バッチ）
+
+- 🔗 **SSO の認証行をハッシュチェーンへ移行**。`api/auth.py` の `_log_audit` は `sequence_number` / `prev_hash` / `record_hash` を付けずに INSERT していたため、`verify_chain` の対象外（＝改ざん検知の外）だった。M365 ブリッジと OIDC の成功・失敗・プロビジョニング（15 箇所）を `create_chained_audit_log` に統一
+- 🧾 **`verify_chain` が未連鎖行の件数を返す**。`unchained_records` を応答に追加（`ChainVerifyResponse` も更新）。連鎖外の行があっても `chain_valid: true` だけでは見えなかったギャップを可視化する
+- 🔐 **AI 設定・M365 資格情報の変更をチェーン監査に記録**（`ai.config.updated` / `m365.config.updated`）。従来は `middleware/audit.py` の平文ログのみだった。**API キー・クライアントシークレットの値は記録せず**、変更の有無（`api_key_changed` / `client_secret_changed`）と有無フラグのみを残す
+- ⚡ **検索の FTS 件数比較を軽量化**。SQLite 経路の `COUNT(*) FROM documents_fts` は FTS5 の全文走査になり得たため `COUNT(rowid)` に変更（行は文書 id をキーに持つため同値）
+- 🧪 品質テストを 35 → 39 件へ拡充（設定変更の監査と秘密値の非記録、未連鎖行の可視化、M365 認証行の連鎖）
+- 🧪 テスト環境に `M365_FERNET_KEY`（固定のテスト専用キー）を設定し、暗号化経路を通すテストを可能にした
+
 ### 修正・強化（2026-10-10 品質テスト第3バッチ）
 
 - 📄 **INDEX.XML に版と ISO 19650 メタデータを出力**。成果品情報のファイル情報へ `版`（`document.revision`）を追加し、ISO 19650 の命名項目（作成者コード・機能分類・情報形式・分野コード・連番）が設定されている文書は `ISO19650情報` として出力する。既存文書（メタデータ無し）の INDEX.XML は `<版 />` 以外変わらない

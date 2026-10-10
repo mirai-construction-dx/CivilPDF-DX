@@ -1,5 +1,7 @@
 """AI model settings API — admin-only configuration for Anthropic API key and model."""
 
+import json
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +17,7 @@ from auth.dependencies import require_admin
 from database import get_db
 from models.user import User
 from services import ai_settings as ai_settings_service
+from services.audit_chain_service import create_chained_audit_log
 
 router = APIRouter(prefix="/ai-config", tags=["AI Settings"])
 
@@ -72,6 +75,27 @@ def update_ai_config(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+
+    # Who turned AI on/off and who replaced the API key is exactly the audit
+    # question this switch exists for; the key value itself is never recorded.
+    create_chained_audit_log(
+        db,
+        user_id=current_user.id,
+        action="ai.config.updated",
+        resource_type="ai_settings",
+        resource_id="1",
+        detail=json.dumps(
+            {
+                "model_name": row.model_name,
+                "enabled": row.enabled,
+                "api_key_changed": body.api_key is not None,
+                "has_api_key": bool(row.api_key_enc),
+            },
+            ensure_ascii=False,
+        ),
+        ip_address=None,
+    )
+    db.commit()
     return _to_public(row)
 
 
