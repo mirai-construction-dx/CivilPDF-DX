@@ -13,6 +13,12 @@ vi.mock("../api/editor", () => ({
   flattenCheck: vi.fn(),
 }));
 vi.mock("../api/auditLogs", () => ({ listAuditLogs: vi.fn() }));
+// EditorSyncView also mounts a DX-sync stats query. Without this mock the file
+// issued a real HTTP request per test, which made these tests non-hermetic and
+// pushed "loads the document list into the selector" to 865ms against the 1000ms
+// waitFor budget when the whole suite ran in parallel — the source of its flaky
+// failures.
+vi.mock("../api/stats", () => ({ getDxSyncStats: vi.fn() }));
 
 import { listDocuments } from "../api/documents";
 import {
@@ -22,6 +28,18 @@ import {
   flattenCheck,
 } from "../api/editor";
 import { listAuditLogs } from "../api/auditLogs";
+import { getDxSyncStats } from "../api/stats";
+
+const dxStats = {
+  total: 12,
+  success: 12,
+  error: 0,
+  success_rate_total: 100,
+  success_rate_30d: 100,
+  recent_30d: { total: 3, success: 3, error: 0 },
+  by_error_kind_30d: {},
+  monthly: [],
+};
 
 const docs = [
   {
@@ -136,6 +154,7 @@ describe("EditorSyncView", () => {
     vi.mocked(getWorkflowStatus).mockResolvedValue(workflow as never);
     vi.mocked(listRevisions).mockResolvedValue(revisions as never);
     vi.mocked(listAuditLogs).mockResolvedValue(audit as never);
+    vi.mocked(getDxSyncStats).mockResolvedValue(dxStats as never);
   });
 
   it("shows a placeholder until a document is selected", async () => {

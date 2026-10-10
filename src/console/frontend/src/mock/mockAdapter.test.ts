@@ -166,4 +166,277 @@ describe("mockAdapter", () => {
       response: { status: 404 },
     });
   });
+
+  /* ---------- WEB-WF-005 差戻し（return） / 再申請（resubmit） ---------- */
+
+  it("returns a step then resubmits the workflow", async () => {
+    const created = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[0].id,
+          approver_ids: [mockUsers[1].id, mockUsers[2].id],
+        }),
+      }),
+    );
+    const wf = mockWorkflows.find((w) => w.id === created.data.id)!;
+    const doc = mockDocuments.find((d) => d.id === mockDocuments[0].id)!;
+    const first = wf.steps[0];
+
+    const returned = await mockAdapter(
+      req("post", `/workflows/${wf.id}/steps/${first.id}/decide`, {
+        data: JSON.stringify({ decision: "return", comment: "寸法不整合" }),
+      }),
+    );
+    expect(returned.data.status).toBe("returned");
+    expect(first.status).toBe("returned");
+    expect(first.comment).toBe("寸法不整合");
+    expect(first.decided_at).not.toBeNull();
+    expect(wf.completed_at).toBeNull();
+    expect(doc.status).toBe("draft");
+
+    const resubmitted = await mockAdapter(
+      req("post", `/workflows/${wf.id}/resubmit`),
+    );
+    expect(resubmitted.data.status).toBe("in_progress");
+    expect(wf.status).toBe("in_progress");
+    expect(wf.completed_at).toBeNull();
+    expect(wf.steps.every((s) => s.status === "pending")).toBe(true);
+    expect(wf.steps.every((s) => s.comment === null)).toBe(true);
+    expect(wf.steps.every((s) => s.decided_at === null)).toBe(true);
+    expect(doc.status).toBe("pending_review");
+  });
+
+  it("rejects resubmit for a workflow that is not returned with 409", async () => {
+    const wf = mockWorkflows.find((w) => w.status === "approved")!;
+    await expect(
+      mockAdapter(req("post", `/workflows/${wf.id}/resubmit`)),
+    ).rejects.toMatchObject({
+      response: { status: 409 },
+    });
+  });
+
+  it("rejects return when a previous step is already approved with 409", async () => {
+    const created = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[1].id,
+          approver_ids: [mockUsers[1].id, mockUsers[2].id],
+        }),
+      }),
+    );
+    const wf = mockWorkflows.find((w) => w.id === created.data.id)!;
+    wf.steps[0].status = "approved";
+
+    await expect(
+      mockAdapter(
+        req("post", `/workflows/${wf.id}/steps/${wf.steps[1].id}/decide`, {
+          data: JSON.stringify({ decision: "return", comment: null }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { status: 409 },
+    });
+    expect(wf.steps[1].status).toBe("pending");
+  });
+
+  it("rejects decisions while the workflow is returned with 409", async () => {
+    const created = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[2].id,
+          approver_ids: [mockUsers[1].id, mockUsers[2].id],
+        }),
+      }),
+    );
+    const wf = mockWorkflows.find((w) => w.id === created.data.id)!;
+    const [first, second] = wf.steps;
+
+    await mockAdapter(
+      req("post", `/workflows/${wf.id}/steps/${first.id}/decide`, {
+        data: JSON.stringify({ decision: "return", comment: "要修正" }),
+      }),
+    );
+    expect(wf.status).toBe("returned");
+
+    await expect(
+      mockAdapter(
+        req("post", `/workflows/${wf.id}/steps/${second.id}/decide`, {
+          data: JSON.stringify({ decision: "approve" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        status: 409,
+        data: {
+          detail: "Workflow was returned; resubmit it before deciding steps",
+        },
+      },
+    });
+    expect(second.status).toBe("pending");
+
+    // 再申請後は通常どおり decide できる
+    await mockAdapter(req("post", `/workflows/${wf.id}/resubmit`));
+    const approved = await mockAdapter(
+      req("post", `/workflows/${wf.id}/steps/${first.id}/decide`, {
+        data: JSON.stringify({ decision: "approve" }),
+      }),
+    );
+    expect(approved.data.status).toBe("in_progress");
+    expect(first.status).toBe("approved");
+  });
+
+  it("rejects deciding an already-decided step with 409", async () => {
+    const created = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[3].id,
+          approver_ids: [mockUsers[1].id, mockUsers[2].id],
+        }),
+      }),
+    );
+    const wf = mockWorkflows.find((w) => w.id === created.data.id)!;
+    const [first, second] = wf.steps;
+    const decide = (stepId: string, decision: string) =>
+      mockAdapter(
+        req("post", `/workflows/${wf.id}/steps/${stepId}/decide`, {
+          data: JSON.stringify({ decision, comment: null }),
+        }),
+      );
+
+    // approved 済みステップへの再決定
+    await decide(first.id, "approve");
+    await expect(decide(first.id, "approve")).rejects.toMatchObject({
+      response: { status: 409, data: { detail: "Step already decided" } },
+    });
+    expect(first.status).toBe("approved");
+
+    // rejected 済みステップへの再決定
+    await decide(second.id, "reject");
+    await expect(decide(second.id, "reject")).rejects.toMatchObject({
+      response: { status: 409, data: { detail: "Step already decided" } },
+    });
+    expect(second.status).toBe("rejected");
+
+    // returned 済みステップへの再決定は「二重決定」が先に返る（差戻し中の 409 より前）
+    const returnedCreated = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[4].id,
+          approver_ids: [mockUsers[1].id],
+        }),
+      }),
+    );
+    const returnedWf = mockWorkflows.find(
+      (w) => w.id === returnedCreated.data.id,
+    )!;
+    const returnedStep = returnedWf.steps[0];
+    await mockAdapter(
+      req(
+        "post",
+        `/workflows/${returnedWf.id}/steps/${returnedStep.id}/decide`,
+        {
+          data: JSON.stringify({ decision: "return", comment: "要修正" }),
+        },
+      ),
+    );
+    expect(returnedWf.status).toBe("returned");
+
+    await expect(
+      mockAdapter(
+        req(
+          "post",
+          `/workflows/${returnedWf.id}/steps/${returnedStep.id}/decide`,
+          { data: JSON.stringify({ decision: "return" }) },
+        ),
+      ),
+    ).rejects.toMatchObject({
+      response: { status: 409, data: { detail: "Step already decided" } },
+    });
+    expect(returnedStep.status).toBe("returned");
+  });
+
+  it("rejects approve/reject until previous steps are approved", async () => {
+    const created = await mockAdapter(
+      req("post", "/workflows/", {
+        data: JSON.stringify({
+          document_id: mockDocuments[5].id,
+          approver_ids: [mockUsers[1].id, mockUsers[2].id],
+        }),
+      }),
+    );
+    const wf = mockWorkflows.find((w) => w.id === created.data.id)!;
+    const [first, second] = wf.steps;
+    const decide = (stepId: string, decision: string) =>
+      mockAdapter(
+        req("post", `/workflows/${wf.id}/steps/${stepId}/decide`, {
+          data: JSON.stringify({ decision, comment: null }),
+        }),
+      );
+
+    // 先行（step1）が未承認のうちは step2 を承認できない
+    await expect(decide(second.id, "approve")).rejects.toMatchObject({
+      response: {
+        status: 409,
+        data: { detail: "Previous approval steps must be approved first" },
+      },
+    });
+    expect(second.status).toBe("pending");
+
+    // 却下も同じ順序ガードで拒否される
+    await expect(decide(second.id, "reject")).rejects.toMatchObject({
+      response: {
+        status: 409,
+        data: { detail: "Previous approval steps must be approved first" },
+      },
+    });
+    expect(second.status).toBe("pending");
+    expect(wf.status).toBe("in_progress");
+
+    // step1 を承認すれば step2 を承認できる（全ステップ承認で wf=approved）
+    await decide(first.id, "approve");
+    const decided = await decide(second.id, "approve");
+    expect(decided.data.status).toBe("approved");
+    expect(second.status).toBe("approved");
+    expect(wf.completed_at).not.toBeNull();
+  });
+
+  it("validates the decision body (422) before resolving wf/step (404)", async () => {
+    // 不正 decision × 不在 step → body 検証が先で 422
+    await expect(
+      mockAdapter(
+        req("post", "/workflows/wf-001/steps/no-such-step/decide", {
+          data: JSON.stringify({ decision: "maybe" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        status: 422,
+        data: {
+          detail: "Invalid decision: maybe (expected approve|reject|return)",
+        },
+      },
+    });
+
+    // 不正 decision × 不在 workflow でも 422
+    await expect(
+      mockAdapter(
+        req("post", "/workflows/no-such-wf/steps/no-such-step/decide", {
+          data: JSON.stringify({ decision: "maybe" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { status: 422 },
+    });
+
+    // 正しい decision なら従来どおり 404
+    await expect(
+      mockAdapter(
+        req("post", "/workflows/wf-001/steps/no-such-step/decide", {
+          data: JSON.stringify({ decision: "approve" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { status: 404 },
+    });
+  });
 });

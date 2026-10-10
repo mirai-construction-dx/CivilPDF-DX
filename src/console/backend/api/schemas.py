@@ -226,14 +226,17 @@ class WorkflowListItem(BaseModel):
 
 
 class ApprovalDecision(BaseModel):
-    decision: str  # "approve" or "reject"
+    # "approve" ... ステップ承認
+    # "reject"  ... 却下（ワークフロー終端。従来どおり）
+    # "return"  ... 差戻し（WEB-WF-005。起票者が修正して再申請できる。終端しない）
+    decision: str
     comment: Optional[str] = None
 
     @field_validator("decision")
     @classmethod
     def validate_decision(cls, v: str) -> str:
-        if v not in ("approve", "reject"):
-            raise ValueError("decision must be 'approve' or 'reject'")
+        if v not in ("approve", "reject", "return"):
+            raise ValueError("decision must be 'approve', 'reject' or 'return'")
         return v
 
 

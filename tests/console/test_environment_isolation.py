@@ -52,3 +52,30 @@ def test_database_url_is_not_a_remote_host():
         assert (
             remote_marker not in url
         ), f"tests are pointed at a remote database ({remote_marker}): {url.split('@')[-1]}"
+
+
+def test_app_engine_is_isolated_from_the_deployed_database():
+    """The app's own engine must not point at the configured (deployed) database.
+
+    Regression context (2026-10-10): the ``get_db`` override in conftest only
+    covers FastAPI dependencies, so ``database.engine`` — built from
+    ``DATABASE_URL`` at import time and used directly by ``/health/ready`` —
+    still pointed at the deployed ``.env`` database. Running pytest from the
+    repository root therefore asserted the dialect of the real PostgreSQL
+    instance (``assert 'postgresql' == 'sqlite'``) and made ``test_enum_parity``
+    run against a schema-less database. Setting ``DATABASE_URL`` in conftest
+    before ``from main import app`` is what keeps this hermetic; this assertion
+    fails loudly if that isolation is ever removed.
+    """
+    from database import engine
+
+    assert engine.dialect.name == "sqlite", (
+        "the app's engine is not isolated: /health/ready and any other code path "
+        "that uses database.engine directly would talk to the deployed database "
+        f"({engine.url.get_backend_name()}). Set DATABASE_URL to a temporary "
+        "SQLite file in conftest.py before importing the app."
+    )
+    assert engine.url.get_backend_name() == settings.database_url.split(":", 1)[0], (
+        "the app's engine and settings.database_url disagree; the conftest "
+        "isolation is not applied to the imported engine"
+    )
