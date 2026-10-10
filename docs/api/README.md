@@ -100,7 +100,7 @@ https://<your-domain>/api/v1/
 |---|---|---|
 | GET | `/api/v1/audit-logs/` | 監査ログ一覧（管理者・ページネーション/フィルタ） |
 | GET | `/api/v1/audit-logs/export.csv` | 監査ログ CSV 出力（管理者・出力自体も監査） |
-| GET | `/api/v1/audit-logs/verify` | 監査チェーン検証（管理者） |
+| GET | `/api/v1/audit-logs/verify` | 監査チェーン検証（管理者）。応答: `chain_valid` / `records_checked` / `first_broken_sequence` / **`unchained_records`**（連鎖していない行の件数。0 でない場合、`chain_valid=true` でも監査の一部が検証対象外） / `error` |
 | GET | `/api/v1/stats/` | 全体統計 |
 | GET | `/api/v1/stats/security` | セキュリティイベント統計（管理者） |
 | GET | `/api/v1/stats/security-config` | セキュリティ設定統計 |

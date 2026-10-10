@@ -164,6 +164,7 @@ def verify_chain(db: Session, limit: int = 1000) -> dict:
     - chain_valid: bool
     - records_checked: int
     - first_broken_sequence: int | None
+    - unchained_records: int (rows with no sequence_number; outside the chain)
     - error: str | None
     """
     records = (
@@ -174,11 +175,21 @@ def verify_chain(db: Session, limit: int = 1000) -> dict:
         .all()
     )
 
+    # Rows written before they were chained (or by a path that forgot to chain)
+    # carry no sequence_number. verify_chain only recomputes the chained rows, so
+    # a bare "chain_valid: true" would hide them: count them and surface the
+    # number so an operator can see the coverage gap instead of trusting a green
+    # result. They are never silently included in the chain.
+    unchained_rows = (
+        db.query(AuditLog).filter(AuditLog.sequence_number == None).count()  # noqa: E711
+    )
+
     if not records:
         return {
             "chain_valid": True,
             "records_checked": 0,
             "first_broken_sequence": None,
+            "unchained_records": unchained_rows,
             "error": None,
         }
 
@@ -189,6 +200,7 @@ def verify_chain(db: Session, limit: int = 1000) -> dict:
                 "chain_valid": False,
                 "records_checked": record.sequence_number,
                 "first_broken_sequence": record.sequence_number,
+                "unchained_records": unchained_rows,
                 "error": f"prev_hash mismatch at sequence {record.sequence_number}",
             }
 
@@ -218,5 +230,6 @@ def verify_chain(db: Session, limit: int = 1000) -> dict:
         "chain_valid": True,
         "records_checked": len(records),
         "first_broken_sequence": None,
+        "unchained_records": unchained_rows,
         "error": None,
     }

@@ -5,6 +5,7 @@ ciphertext of client_secret (never returned by the API). Provides a
 test-connection probe and a Graph user lookup.
 """
 
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,7 @@ from auth.dependencies import require_admin
 from database import get_db
 from models.user import User
 from services import m365 as m365_service
+from services.audit_chain_service import create_chained_audit_log
 
 router = APIRouter(prefix="/m365", tags=["M365"])
 
@@ -73,6 +75,29 @@ def update_m365_config(
         default_role=body.default_role,
         updated_by=current_user.id,
     )
+    # Credential/tenant changes decide which Microsoft identity can sign in;
+    # record who changed them (the secret value is never recorded).
+    create_chained_audit_log(
+        db,
+        user_id=current_user.id,
+        action="m365.config.updated",
+        resource_type="m365_settings",
+        resource_id="1",
+        detail=json.dumps(
+            {
+                "tenant_id": row.tenant_id,
+                "client_id": row.client_id,
+                "enabled": row.enabled,
+                "auto_provision": row.auto_provision,
+                "default_role": row.default_role,
+                "client_secret_changed": body.client_secret is not None,
+                "has_client_secret": bool(row.client_secret_enc),
+            },
+            ensure_ascii=False,
+        ),
+        ip_address=None,
+    )
+    db.commit()
     return _to_public(row)
 
 
