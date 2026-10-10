@@ -66,6 +66,18 @@ def import_review_sidecar(
         )
     doc = _get_doc_or_404(doc_id, db)
     assert_document_visible(doc, current_user)
+    # An approved document is evidence: importing a sidecar must not rewrite its
+    # status back to EDITOR_DRAFT/EDITOR_REVIEWED. The reviewer has to go through
+    # the workflow again (差戻し→再申請) so the approval record and the document
+    # state cannot drift apart.
+    if doc.status in (DocumentStatus.APPROVED, DocumentStatus.FINALIZED):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Document is approved/finalized; return it through the approval "
+                "workflow before importing review content"
+            ),
+        )
     doc.review_sidecar = sidecar_dict
     doc.review_sidecar_imported_at = datetime.now(timezone.utc)
     doc.status = determine_editor_status(sidecar_dict)
