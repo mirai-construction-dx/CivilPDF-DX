@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -125,6 +126,14 @@ class Document(Base):
 
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
+    # Version numbers are allocated with max()+1; without a constraint two
+    # concurrent uploads can both pick the same number and the audit trail then
+    # carries two different revisions under one version.
+    __table_args__ = (
+        UniqueConstraint(
+            "document_id", "version_number", name="uq_document_versions_number"
+        ),
+    )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = Column(String, ForeignKey("documents.id"), nullable=False)
@@ -154,7 +163,7 @@ class ApprovalWorkflow(Base):
     )
     status = Column(
         String, default="pending"
-    )  # pending, in_progress, approved, rejected
+    )  # pending, in_progress, approved, rejected, returned
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -190,7 +199,7 @@ class ApprovalStep(Base):
     workflow_id = Column(String, ForeignKey("approval_workflows.id"), nullable=False)
     approver_id = Column(String, ForeignKey("users.id"), nullable=False)
     order = Column(Integer, nullable=False)
-    status = Column(String, default="pending")  # pending, approved, rejected
+    status = Column(String, default="pending")  # pending, approved, rejected, returned
     comment = Column(Text, nullable=True)
     decided_at = Column(DateTime(timezone=True), nullable=True)
 

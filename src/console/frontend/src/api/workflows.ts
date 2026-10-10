@@ -63,12 +63,22 @@ export async function createWorkflow(
 export async function decideStep(
   workflowId: string,
   stepId: string,
-  decision: "approve" | "reject",
+  decision: "approve" | "reject" | "return",
   comment?: string,
 ): Promise<WorkflowResponse> {
   const res = await api.post<WorkflowResponse>(
     `/workflows/${workflowId}/steps/${stepId}/decide`,
     { decision, comment },
+  );
+  return res.data;
+}
+
+/** WEB-WF-005 再申請: 差戻しされた承認依頼を同じ承認フローで再開する。 */
+export async function resubmitWorkflow(
+  workflowId: string,
+): Promise<WorkflowResponse> {
+  const res = await api.post<WorkflowResponse>(
+    `/workflows/${workflowId}/resubmit`,
   );
   return res.data;
 }

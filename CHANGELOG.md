@@ -8,10 +8,29 @@
 
 ## [Unreleased]
 
+### 追加
+
+- 🔁 承認ワークフローの **差戻し** と **再申請**（WEB-WF-005）
+  - `POST /api/v1/workflows/{id}/steps/{sid}/decide` の `decision` に `return` を追加。差戻しではステップとワークフローが `returned` になり、文書は再編集可能な `draft` へ戻る（`completed_at` はクリア）。**差戻し中（`returned`）は再申請するまで `decide` を 409 で拒否**し、差戻しが承認操作で無効化されないようにする
+  - `POST /api/v1/workflows/{id}/resubmit` を追加。起票者または admin が再申請すると全ステップが `pending` に戻り、文書は `pending_review`、先頭承認者へ通知
+  - 差戻し時に起票者へ理由つきアプリ内通知。監査ログに `workflow.step.returned` / `workflow.resubmitted` を追記（`approve` / `reject` は従来どおり `workflow.step.decided`）
+  - 既存の `approve` / `reject` の挙動は不変（`reject` は従来どおり終端）
+  - **DB migration は不要**（新カラム・新 enum 値なし）。仕様と決定の根拠: [docs/architecture/workflow-return-resubmit-design.md](docs/architecture/workflow-return-resubmit-design.md)
+  - 制限: 先行ステップが承認済みの場合の巻き戻し（任意ステップへの差戻し）は未対応。該当操作は 409
+
+### 修正・強化（2026-10-10 品質テスト第1バッチ）
+
+- 🔐 **文書の削除・復元に所有者/ロール判定を追加**。従来は可視性（プロジェクトメンバー）だけで判定していたため、メンバーであれば viewer/engineer でも他者の文書をアーカイブ・復元できた。`update_document` / `apply_timestamp` と同じ「owner または admin/manager」に統一（判定は `_assert_can_modify_document` に集約）
+- 📦 **電子納品 ZIP の再現性を修正**。`generate_delivery_zip` が `generated_at` を受け取れるようにし、ZIP エントリの時刻を固定（`ZipInfo`）した。従来は内部で `datetime.now` を呼び、エントリ時刻も `time.localtime` 由来だったため、同一入力でも再納品のたびにバイトが変わっていた
+- 🧾 **リビジョンの PDF 実体を保存**。これまでメタデータのみで `file_path` が NULL のままだったため「旧版参照」が成立していなかった。実体を保存し、`GET /api/v1/documents/{id}/revisions/{version_number}/download` を追加（実体の無い旧版は 410）
+- 🔒 **版番号の一意性を DB で保証**。`document_versions (document_id, version_number)` に UNIQUE 制約を追加（migration `p6q7r8s9t0u1`）。既存重複は最大番号の上へ採番し直してから制約を作成
+- 🧪 品質テスト `tests/console/test_quality_business_flows.py`（25 件）を追加: 文書→承認、電子納品の再現性、保持期限の算定、監査チェーンの改ざん検知、権限境界（メンバーでも削除不可）、AI が種別・状態を書かないこと、版の実体保存、版番号の一意性
+
 ### 計画中
 
 - アプリ配信: 展開対象/KPI の実 MDM（Intune / Jamf）連携
 - PDF Editor デスクトップ本体 + ビルドパイプライン新規構築（Issue #62 / Scope B）
+- 承認ワークフロー: 先行ステップ承認後の差戻し（巻き戻し）仕様の確定 — 現状は 409 で拒否
 
 ---
 
