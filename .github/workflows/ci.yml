@@ -224,6 +224,96 @@ jobs:
           shellcheck -S warning scripts/*.sh deploy/install-systemd.sh
       - name: Validate version sync
         run: ./scripts/verify-version-sync.sh
+      - name: Verify docker compose definitions
+        run: ./scripts/verify-compose.sh
+
+  staging-compose-changes:
+    name: Staging Compose Changes
+    runs-on: ubuntu-latest
+    # paths-filter is only meaningful for PR/push; merge_group skips this job,
+    # which in turn skips the (non-required) smoke job below.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      staging: ${{ steps.filter.outputs.staging }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            staging:
+              - 'docker-compose.staging.yml'
+              - 'docker-compose.prod.yml'
+              - 'docker-compose.mvp.yml'
+              - '.env.stg.example'
+              - '.env.prod.example'
+              - 'scripts/staging-smoke.py'
+              - 'scripts/verify-compose.sh'
+              - 'scripts/seed_demo_data.py'
+              - 'src/console/backend/**'
+              - 'src/console/frontend/Dockerfile.prod'
+              - 'src/console/frontend/nginx.conf'
+              - '.github/workflows/ci.yml'
+
+  staging-compose-smoke:
+    name: Staging Compose Smoke
+    needs: staging-compose-changes
+    if: needs.staging-compose-changes.outputs.staging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # NON-REQUIRED check name: intentionally NOT added to the required-check
+    # ruleset. It builds and boots the staging stack and runs the staging smoke,
+    # so a broken docker-compose.staging.yml fails visibly without gating merges.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate throwaway staging env (.env.stg)
+        run: |
+          {
+            echo "ENVIRONMENT=staging"
+            echo "DEBUG=false"
+            echo "POSTGRES_DB=civilpdf_stg"
+            echo "POSTGRES_USER=civilpdf_stg"
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+            echo "FRONTEND_PORT=18971"
+            echo "UVICORN_WORKERS=2"
+            echo "SECRET_KEY=$(openssl rand -hex 32)"
+            echo "ALGORITHM=HS256"
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=60"
+            echo "REFRESH_TOKEN_EXPIRE_DAYS=7"
+            echo "TIMESTAMP_HMAC_KEY=$(openssl rand -hex 32)"
+            echo 'CORS_ORIGINS=["http://127.0.0.1:18971"]'
+            echo "MAX_FILE_SIZE_MB=100"
+          } > .env.stg
+      - name: Build and start staging stack
+        run: docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
+      - name: Wait for staging to become healthy
+        run: |
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:18971/health >/dev/null 2>&1; then
+              echo "staging healthy after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "staging did not become healthy in time" >&2
+          docker compose --env-file .env.stg -f docker-compose.staging.yml ps
+          docker compose --env-file .env.stg -f docker-compose.staging.yml logs --tail=200
+          exit 1
+      - name: Install httpx
+        run: pip install httpx
+      - name: Run staging smoke
+        env:
+          BASE_URL: http://127.0.0.1:18971
+        run: python scripts/staging-smoke.py
+      - name: Tear down staging stack
+        if: always()
+        run: docker compose --env-file .env.stg -f docker-compose.staging.yml down -v
 
   frontend-lint-test:
     name: Frontend Lint & Test
