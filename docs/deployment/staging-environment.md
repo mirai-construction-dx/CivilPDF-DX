@@ -141,6 +141,31 @@ BASE_URL=https://civilpdf-stg.mirai-dx-platform.com python scripts/staging-smoke
 CI（`.github/workflows/staging-verify.yml`）は `workflow_dispatch` と日次のみで起動し、
 **required check ではない**（main の branch protection / ruleset に含めない）。
 
+### CI での検証
+
+PR #164 で追加した staging 定義が黙って退行しないよう、`.github/workflows/ci.yml` に
+2 つのガードを置く。
+
+- **`scripts/verify-compose.sh`**（`ops-checks` ジョブ内・既存の required check 名は変更しない）:
+  - 各 compose ファイルが well-formed であること
+    （`docker compose -f <file> config --no-interpolate -q`）。
+  - 解決済み config を解析し、`docker-compose.staging.yml` が project `civilpdf-stg` で
+    あること、公開ホストポートが frontend の `127.0.0.1`（loopback 限定）ただ 1 つで
+    あること、`db` / `backend` がホストへポート公開しないことを検証する。
+    さらに `docker-compose.prod.yml` の `db` / `backend` がホストへポート公開しないことも検証する。
+  - 各チェックを PASS/FAIL で出力し、失敗すると非ゼロで終了する。解決は使い捨ての
+    `.env` / `.env.stg` を使うため、リポジトリの実 `.env` / `.env.stg` は読まないし書き換えない。
+- **`Staging Compose Smoke`**（`staging-compose-smoke`・**required ではない新規 check 名**）:
+  - `pull_request` / `push`（`main` / `develop`）で、compose・staging スクリプト・backend など
+    関連ファイルが変更されたときだけ `dorny/paths-filter` ゲートで起動する。
+  - `openssl rand` で捨ての `.env.stg` を生成し、
+    `docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build` で
+    実際に起動、healthy を待って `BASE_URL=http://127.0.0.1:18971 python scripts/staging-smoke.py`
+    を実行する。
+  - `if: always()` の teardown ステップで必ず
+    `docker compose --env-file .env.stg -f docker-compose.staging.yml down -v` する。
+  - main の ruleset には加えない（既存の required check 名を追加・変更しない）。
+
 ## 7. ロールバック
 
 ```bash
