@@ -2732,6 +2732,19 @@
   border-radius: 3px;
   border: 1px solid var(--border);
 }
+/* Staging-only marker (MCDX-ADR-0010 rule 6): warn palette + text, never
+   colour alone, so a staging session is never mistaken for production. */
+.ep-env-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: var(--warn-soft);
+  color: var(--warn-fg);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--warn);
+}
 
 /* Nav groups */
 .ep-nav-groups {

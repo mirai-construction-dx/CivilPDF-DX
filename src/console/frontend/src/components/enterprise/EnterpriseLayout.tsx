@@ -1,6 +1,6 @@
 import { type FC, useState, useEffect, useRef, useCallback } from "react";
 import "../../styles/enterprise.css";
-import { fetchServerVersion } from "../../api/version";
+import { fetchServerInfo } from "../../api/version";
 import { LandingView } from "./views/LandingView";
 import { DashboardView } from "./views/DashboardView";
 import { UploadView } from "./views/UploadView";
@@ -600,12 +600,20 @@ export const EnterpriseLayout: FC = () => {
     }
   }
 
-  // Show the version the server actually runs (was a stale hard-coded v0.4.2).
+  // Show the version the server actually runs (was a stale hard-coded v0.4.2)
+  // plus the environment so a staging session is never mistaken for production
+  // (MCDX-ADR-0010 rule 6 / ADR-0005 U-5).
   const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [serverEnvironment, setServerEnvironment] = useState<string | null>(
+    null,
+  );
   useEffect(() => {
     let alive = true;
-    fetchServerVersion().then((v) => {
-      if (alive) setServerVersion(v);
+    fetchServerInfo().then((info) => {
+      if (alive) {
+        setServerVersion(info.version);
+        setServerEnvironment(info.environment);
+      }
     });
     return () => {
       alive = false;
@@ -628,6 +636,15 @@ export const EnterpriseLayout: FC = () => {
             <span className="ep-brand-badge">
               {serverVersion ? `v${serverVersion} · Enterprise` : "Enterprise"}
             </span>
+            {serverEnvironment === "staging" && (
+              <span
+                className="ep-env-badge"
+                role="status"
+                aria-label="ステージング環境で実行中（本番環境ではありません）"
+              >
+                STAGING
+              </span>
+            )}
           </div>
           <nav className="ep-nav-groups">
             {NAV_GROUPS.map((group) => (

@@ -8,7 +8,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EnterpriseLayout } from "../components/enterprise/EnterpriseLayout";
 import { useAuthStore } from "../store/auth";
 
@@ -247,4 +247,56 @@ describe("EnterpriseLayout — functional page integration", () => {
       expect.stringContaining("承認待ち 4 件"),
     );
   });
+});
+
+describe("EnterpriseLayout — staging environment marker (MCDX-ADR-0010 r6)", () => {
+  function stubHealth(environment: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          status: "ok",
+          version: "0.10.0",
+          environment,
+        }),
+      })),
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ user: mockAdmin, isAuthenticated: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an accessible STAGING marker when /health reports staging", async () => {
+    stubHealth("staging");
+    renderShell();
+
+    const marker = await screen.findByText("STAGING");
+    expect(marker).toHaveAttribute("role", "status");
+    expect(marker).toHaveAttribute(
+      "aria-label",
+      "ステージング環境で実行中（本番環境ではありません）",
+    );
+    expect(await screen.findByText("v0.10.0 · Enterprise")).toBeInTheDocument();
+  });
+
+  it.each(["production", "development", null, undefined, "test"])(
+    "shows no STAGING marker when environment is %s",
+    async (environment) => {
+      stubHealth(environment);
+      renderShell();
+
+      // Wait for the /health round-trip to land (the version chip updates) so
+      // this asserts the post-fetch render, not the pre-fetch one.
+      await screen.findByText("v0.10.0 · Enterprise");
+      expect(screen.queryByText("STAGING")).not.toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    },
+  );
 });
