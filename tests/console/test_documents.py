@@ -117,12 +117,19 @@ class TestDocumentUpload:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 204
+        # AT-DOC-006: a soft-deleted document is 404 on its direct URL and is
+        # only reachable through the trash list.
         get_resp = client.get(
             f"/api/v1/documents/{doc_id}",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert get_resp.status_code == 200
-        assert get_resp.json()["deletion_requested_at"] is not None
+        assert get_resp.status_code == 404
+        trash = client.get(
+            "/api/v1/documents/trash",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ).json()
+        trashed = next(d for d in trash if d["id"] == doc_id)
+        assert trashed["deletion_requested_at"] is not None
         list_resp = client.get(
             "/api/v1/documents/",
             headers={"Authorization": f"Bearer {admin_token}"},

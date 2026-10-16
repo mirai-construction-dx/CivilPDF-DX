@@ -247,8 +247,10 @@ class TestDocumentApprovalLifecycle:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert restored.status_code == 200, restored.text
-        # Restore returns the document to an editable state; the approval record stays.
-        assert restored.json()["status"] == "draft"
+        # C-1: restore returns the document to its pre-deletion status. It was
+        # approved before deletion, so it comes back as approved; the workflow
+        # record stays approved either way.
+        assert restored.json()["status"] == "approved"
         assert (
             client.get(
                 f"/api/v1/workflows/{workflow_id}",
@@ -448,14 +450,18 @@ class TestElectronicDeliveryReproducibility:
 class TestRetentionArithmetic:
     """docs/requirements.md §3.2.6 WEB-AUDIT-005 / 電子帳簿保存法の区分別保持。"""
 
-    def test_expiry_is_the_documented_365_day_rule(self):
-        """保持期限は「作成日 + 365日 × 年数」で決定的に計算される（仕様の明示）。"""
+    def test_expiry_is_counted_in_calendar_years(self):
+        """保持期限は暦年（同じ月日）で計算される（保有日数を1日も短くしない）。
+
+        以前は「作成日 + 365日 × 年数」で、うるう日を跨ぐごとに期限が1日ずつ
+        短くなっていた（7年で最大2日）。B-2 の決定と整合させるため暦年に統一した。
+        """
         created = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        assert retention_service.calculate_expiry(created, 7) == created + timedelta(
-            days=7 * 365
+        assert retention_service.calculate_expiry(created, 7) == created.replace(
+            year=2033
         )
-        assert retention_service.calculate_expiry(created, 10) == created + timedelta(
-            days=10 * 365
+        assert retention_service.calculate_expiry(created, 10) == created.replace(
+            year=2036
         )
 
     def test_permanent_and_immediate_policies(self):
@@ -465,21 +471,17 @@ class TestRetentionArithmetic:
         assert retention_service.calculate_expiry(created, 7, is_permanent=True) is None
         assert retention_service.calculate_expiry(created, 0) == created
 
-    def test_calendar_year_boundary_is_not_silently_extended(self):
-        """うるう年を含む期間でも規則は 365日×年数 のまま（規則の一貫性を固定）。
+    def test_leap_day_start_moves_forward_not_backward(self):
+        """2/29 起点で対象年がうるう年でない場合は 3/1 へ進める（短くしない）。
 
-        実カレンダー年（例: 2028-02-29 起点の 1 年）と 365 日は 1 日ずれる。
-        どちらを採るかは業務判断であり、ここでは「規則が一貫していること」と
-        「うるう日を跨いでも例外処理が無いこと」を固定して差分を可視化する。
+        2028-02-29 + 1年 は 2029-02-29 が存在しないため 2029-03-01 とする。
+        365日後（2029-02-28）より後ろになり、暦年を下回らないことを固定する。
         """
         leap_start = datetime(2028, 2, 29, tzinfo=timezone.utc)
-        assert retention_service.calculate_expiry(
-            leap_start, 1
-        ) == leap_start + timedelta(days=365)
-        # 365日後は 2029-02-28（うるう日は前年で既に通過）
-        assert retention_service.calculate_expiry(leap_start, 1).date().isoformat() == (
-            "2029-02-28"
-        )
+        expiry = retention_service.calculate_expiry(leap_start, 1)
+        assert expiry == leap_start.replace(year=2029, month=3, day=1)
+        assert expiry.date().isoformat() == "2029-03-01"
+        assert (expiry - leap_start) >= timedelta(days=365)
 
 
 # ── 4. 監査証跡（承認と納品） ────────────────────────────────────────────────
@@ -612,16 +614,18 @@ class TestRoleBoundariesAreEnforcedByMembership:
         )
         assert restored.status_code == 200, restored.text
 
-        # manager は他者の文書も扱える（全件可視の規約と整合）
+        # manager は自分の文書を削除・復元できる（§5.2 文書削除: admin=全て,
+        # manager/engineer=自分）。他者の文書の削除・復元は §5.2 でも不可
+        # （test_qa_authz_workflow.py::test_cannot_delete_others_document を参照）。
         manager_id, manager_token = _create_user(client, admin_token, "manager")
-        other_doc = _upload(client, admin_token, project_id, "他者の文書")
+        manager_doc = _upload(client, manager_token, project_id, "managerの文書")
         deleted = client.delete(
-            f"/api/v1/documents/{other_doc}",
+            f"/api/v1/documents/{manager_doc}",
             headers={"Authorization": f"Bearer {manager_token}"},
         )
         assert deleted.status_code == 204, deleted.text
         restored = client.post(
-            f"/api/v1/documents/{other_doc}/restore",
+            f"/api/v1/documents/{manager_doc}/restore",
             headers={"Authorization": f"Bearer {manager_token}"},
         )
         assert restored.status_code == 200, restored.text
@@ -865,11 +869,11 @@ class TestManagerCrossProjectVisibility:
     def test_manager_sees_documents_of_a_project_they_do_not_belong_to(
         self, client, admin_token
     ):
-        """manager は非メンバーのプロジェクト文書も閲覧できる（仕様の固定）。
+        """manager は非メンバーのプロジェクト文書も閲覧できる（A-1 の仕様）。
 
-        `services/access_control.py:22-24` が manager を「全件可視」に含める一方、
-        `api/projects.py:22-31` の一覧は admin のみ全件という非対称がある。ここでは
-        文書側の実効挙動を固定し、一覧側との差を明示的に残す。
+        §5.2「プロジェクト参照」「文書参照」は manager を「全て」と定める。以前は
+        文書側だけが全件で、一覧（`api/projects.py`）は admin のみ全件という非対称が
+        あったが、A-1（2026-10-03 決定）で一覧も manager に全件を返すように統一した。
         """
         project_id = _create_project(client, admin_token)
         doc_id = _upload(client, admin_token, project_id, "他部署の図面")
@@ -882,15 +886,12 @@ class TestManagerCrossProjectVisibility:
         )
         assert readable.status_code == 200, readable.text
 
-        # ただしプロジェクト一覧には出ない（実装の非対称を固定）
+        # プロジェクト一覧にも出る（A-1: admin / manager は全案件）
         listing = client.get(
             "/api/v1/projects/", headers={"Authorization": f"Bearer {manager_token}"}
         )
         assert listing.status_code == 200, listing.text
-        assert project_id not in {entry["id"] for entry in listing.json()}, (
-            "manager のプロジェクト一覧に非メンバー案件が含まれるようになった場合は"
-            "実装が変わったので、このテストの意図（非対称の記録）を更新すること"
-        )
+        assert project_id in {entry["id"] for entry in listing.json()}
         assert manager_id  # 参照保持（未使用警告の回避）
 
 

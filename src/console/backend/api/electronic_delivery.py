@@ -58,7 +58,11 @@ def generate_delivery_zip(
 ):
     """Generate and stream a MLIT-conformant electronic delivery ZIP package.
 
-    Refuses (409) when a deliverable document's file cannot be read: packaging it
+    Refuses (409) when the project has no deliverable document — an
+    INDEX.XML-only package is not a deliverable, and allow_partial cannot
+    produce one either.
+
+    Also refuses (409) when a deliverable document's file cannot be read: packaging it
     would put a 0-byte PDF into an official MLIT deliverable, which is rejected
     on receipt. The failure is explicit and lists the offending documents so they
     can be restored, rather than shipping a package that looks complete.
@@ -71,6 +75,18 @@ def generate_delivery_zip(
     project = _get_project_or_404(project_id, db, current_user)
     # Soft-deleted documents are excluded (see deliverable_documents).
     documents = electronic_delivery_service.deliverable_documents(db, project_id)
+    if not documents:
+        # A package with only INDEX.XML is not a deliverable. 409 (not 422): the
+        # request is well-formed; the project's current state cannot be packaged,
+        # the same class of refusal as the unreadable-file 409 below, and it
+        # matches the readiness check (ready=false for 0 documents).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "納品対象の文書が1件もないため、電子納品パッケージを生成できません。"
+                "文書を登録してから再実行してください。"
+            ),
+        )
     unreadable = electronic_delivery_service.find_unreadable_documents(documents)
 
     if unreadable and not allow_partial:
@@ -88,6 +104,15 @@ def generate_delivery_zip(
 
     omitted_ids = {d["id"] for d in unreadable}
     packaged = [doc for doc in documents if doc.id not in omitted_ids]
+    if not packaged:
+        # allow_partial cannot turn "nothing readable" into an empty deliverable.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"読み取れる文書が1件もないため（読み取れない文書 {len(unreadable)} 件）、"
+                "allow_partial=true でも電子納品パッケージを生成できません。"
+            ),
+        )
 
     zip_bytes = electronic_delivery_service.generate_delivery_zip(project, packaged)
 

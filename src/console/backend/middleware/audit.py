@@ -8,6 +8,12 @@ from fastapi import Request, Response
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from services.request_context import (
+    client_ip_from_request,
+    reset_client_ip,
+    set_client_ip,
+)
+
 logger = logging.getLogger("audit")
 
 SKIP_PATHS = {"/health", "/", "/docs", "/openapi.json", "/redoc"}
@@ -34,6 +40,16 @@ def _extract_user_id(request: Request) -> str | None:
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Expose the client IP to create_chained_audit_log for every request,
+        # including GET endpoints that write audit entries (CSV export, AI
+        # summary). Routers that pass ip_address=None get it from here.
+        ip_token = set_client_ip(client_ip_from_request(request))
+        try:
+            return await self._dispatch(request, call_next)
+        finally:
+            reset_client_ip(ip_token)
+
+    async def _dispatch(self, request: Request, call_next: Callable) -> Response:
         if request.method not in AUDIT_METHODS or request.url.path in SKIP_PATHS:
             return await call_next(request)
 
