@@ -155,12 +155,19 @@ class TestSoftDelete:
         )
         assert resp.status_code == 204
 
+        # AT-DOC-006: the direct URL is 404 after deletion; the logical record
+        # remains and is reachable through the trash list.
         get_resp = client.get(
             f"/api/v1/documents/{doc_id}",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert get_resp.status_code == 200
-        assert get_resp.json()["deletion_requested_at"] is not None
+        assert get_resp.status_code == 404
+        trash = client.get(
+            "/api/v1/documents/trash",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        ).json()
+        trashed = next(d for d in trash if d["id"] == doc_id)
+        assert trashed["deletion_requested_at"] is not None
 
         list_resp = client.get(
             "/api/v1/documents/", headers={"Authorization": f"Bearer {admin_token}"}
@@ -180,6 +187,12 @@ class TestWorkflowOrder:
     ):
         project_id = _create_project(client, admin_token)
         doc_id = _upload_doc(client, admin_token, project_id)
+        # A-3: approvers must be able to view the document (engineer needs
+        # project membership; manager sees every project per A-1).
+        client.post(
+            f"/api/v1/projects/{project_id}/members/{engineer_user.id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
         resp = client.post(
             "/api/v1/workflows/",
             json={

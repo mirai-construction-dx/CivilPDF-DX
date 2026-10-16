@@ -1,7 +1,7 @@
 """Retention policy service — enforces document retention rules."""
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -11,11 +11,14 @@ from models.retention_policy import RetentionPolicy, DEFAULT_POLICIES
 
 logger = logging.getLogger(__name__)
 
-# Default retention years by document type when no specific policy is found
+# Default retention years by document type when no specific policy is found.
+# Counted from the upload date (Document.created_at). Contract and drawing
+# follow decision B-2 (2026-10-03) and match DEFAULT_POLICIES; the other types
+# are not yet decided and keep their earlier values.
 _DEFAULT_RETENTION_MAP: dict[str, int] = {
-    DocumentType.CONTRACT.value: 10,
+    DocumentType.CONTRACT.value: 7,
     DocumentType.INSPECTION.value: 10,
-    DocumentType.DRAWING.value: -1,  # permanent
+    DocumentType.DRAWING.value: 10,
     DocumentType.SAFETY.value: 3,
     DocumentType.REPORT.value: 7,
     DocumentType.PHOTO.value: 5,
@@ -40,13 +43,29 @@ def calculate_expiry(
     retention_years: int,
     is_permanent: bool = False,
 ) -> Optional[datetime]:
-    """Return the expiry datetime, or None if permanent."""
+    """Return the expiry datetime, or None if permanent.
+
+    Retention years are calendar years: the expiry is the same month/day/time
+    ``retention_years`` years after ``created_at`` (2025-04-01 + 7 years →
+    2032-04-01). Previously ``retention_years * 365`` days was used, which ended
+    retention one day early for every leap day crossed (2025-04-01 + 7 years
+    → 2032-03-30).
+
+    Leap day: when ``created_at`` is 29 February and the target year has no
+    29 February, the expiry is moved forward to 1 March of the target year
+    (same time of day), so the retention period is never shorter than
+    ``retention_years`` calendar years (2024-02-29 + 7 years → 2031-03-01).
+    """
     if is_permanent or retention_years < 0:
         return None
     if retention_years == 0:
         # Immediate purpose — expires at creation (delete as soon as purpose is met)
         return created_at
-    return created_at + timedelta(days=retention_years * 365)
+    target_year = created_at.year + retention_years
+    try:
+        return created_at.replace(year=target_year)
+    except ValueError:  # 29 Feb → non-leap target year
+        return created_at.replace(year=target_year, month=3, day=1)
 
 
 def apply_retention_policy(db: Session, doc: Document) -> None:

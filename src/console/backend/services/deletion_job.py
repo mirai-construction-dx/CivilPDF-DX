@@ -10,12 +10,13 @@ Usage:
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from models.audit_log import AuditLog
 from models.document import Document
 from services.audit_chain_service import create_chained_audit_log
 
@@ -23,29 +24,77 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_GRACE_DAYS = 30  # configurable; 30-day cooling-off period
 
+# Grace-period days are counted on the Japanese calendar (業務上の日付基準は JST).
+JST = timezone(timedelta(hours=9), "JST")
+
+PHYSICAL_DELETION_ACTION = "gdpr_physical_deletion"
+
+
+def deletion_cutoff(now: datetime, grace_days: int) -> datetime:
+    """Return the exclusive UTC cutoff for "grace_days 経過後" in JST calendar days.
+
+    A document whose deletion was requested on JST date ``D`` becomes eligible
+    on JST date ``D + grace_days`` (the 30th day is included), from 00:00 JST,
+    regardless of the time of day of the request. Eligible means
+    ``deletion_requested_at < cutoff`` where ``cutoff`` is 00:00 JST of
+    ``today_jst - grace_days + 1``.
+
+    Example (grace_days=30): requested 2026-01-30 23:59 JST → kept through
+    2026-02-28 (29日目), deleted from 2026-03-01 00:00 JST (30日目).
+    """
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    today_jst: date = now.astimezone(JST).date()
+    first_kept_day = today_jst - timedelta(days=grace_days - 1)
+    return datetime.combine(first_kept_day, time(0, 0), tzinfo=JST).astimezone(
+        timezone.utc
+    )
+
 
 def run_deletion_job(
-    db: Session, grace_days: int = DEFAULT_GRACE_DAYS, *, dry_run: bool = False
+    db: Session,
+    grace_days: int = DEFAULT_GRACE_DAYS,
+    *,
+    dry_run: bool = False,
+    now: Optional[datetime] = None,
 ) -> dict:
     """Execute one pass of the physical deletion job.
 
     Args:
         db: SQLAlchemy session.
-        grace_days: Minimum days after deletion_requested_at before physical deletion.
+        grace_days: Days after deletion_requested_at before physical deletion,
+            counted in JST calendar days with the grace_days-th day included
+            (see :func:`deletion_cutoff`).
         dry_run: When True, only report what would be deleted; nothing is
             removed from disk or changed in the database.
+        now: Reference time (tests / reproducible runs). Defaults to the
+            current time.
+
+    The pass is idempotent: a document that already has a
+    ``gdpr_physical_deletion`` entry in the audit chain is not processed again,
+    so re-running the job neither rewrites ``archived_at`` nor duplicates the
+    audit record. (Previously every run re-processed every past-grace
+    document, because ``deletion_requested_at`` stays set after erasure.)
 
     Returns:
         dict with counts: processed, deleted_files, errors.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=grace_days)
+    reference = now or datetime.now(timezone.utc)
+    cutoff = deletion_cutoff(reference, grace_days)
 
+    already_deleted = db.query(AuditLog.resource_id).filter(
+        AuditLog.action == PHYSICAL_DELETION_ACTION,
+        AuditLog.resource_type == "document",
+        AuditLog.resource_id.isnot(None),
+    )
     candidates = (
         db.query(Document)
         .filter(
             Document.deletion_requested_at != None,  # noqa: E711
-            Document.deletion_requested_at <= cutoff,
+            Document.deletion_requested_at < cutoff,
+            Document.id.notin_(already_deleted),
         )
+        .order_by(Document.deletion_requested_at.asc(), Document.id.asc())
         .all()
     )
 
@@ -120,7 +169,7 @@ def _physically_delete(db: Session, doc: Document) -> None:
     create_chained_audit_log(
         db,
         user_id=None,  # system job, no user actor
-        action="gdpr_physical_deletion",
+        action=PHYSICAL_DELETION_ACTION,
         resource_type="document",
         resource_id=doc_id,
         detail="physical deletion executed after grace period; file_path nulled",
