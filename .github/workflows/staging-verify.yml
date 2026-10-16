@@ -1,0 +1,48 @@
+# =============================================================================
+# CivilPDF-DX — STAGING verification (NON-BLOCKING)
+# =============================================================================
+# ⚠️ This workflow is intentionally NON-BLOCKING and is NOT part of the
+#    required-checks ruleset / main branch protection. It triggers ONLY on
+#    manual dispatch and a daily schedule, never on pull_request. Do not add it
+#    to required status checks.
+#
+# It probes the deployed staging environment over HTTPS and asserts
+# `/health` reports `environment == "staging"` (see scripts/staging-smoke.py).
+#
+# Credentials live in the GitHub Environment `staging`
+# (STAGING_ADMIN_EMAIL / STAGING_ADMIN_PASSWORD); they are never committed.
+# The environment itself is created by a human gate
+# (docs/architecture/ADR-0005-staging-environment.md §未決定).
+# =============================================================================
+
+name: Staging Verify
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 00:20 UTC (09:20 JST).
+    - cron: "20 0 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-smoke:
+    name: Staging smoke (non-blocking)
+    runs-on: ubuntu-latest
+    environment: staging
+    # Kept off the ruleset: this job never gates a merge.
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install httpx
+        run: pip install httpx
+      - name: Run staging smoke
+        env:
+          BASE_URL: https://civilpdf-stg.mirai-dx-platform.com
+          STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+        run: python scripts/staging-smoke.py

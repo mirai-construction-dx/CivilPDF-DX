@@ -1,0 +1,24 @@
+# CivilPDF-DX STAGING Cloudflare Tunnel config
+# 実体の配置先: ~/.cloudflared/civilpdf-stg-config.yml
+# credentials JSON (~/.cloudflared/<TUNNEL_ID>.json) は秘密情報 — git 管理しない。
+#
+# 経路: https://civilpdf-stg.mirai-dx-platform.com
+#         -> cloudflared tunnel (civilpdf-stg) -> 127.0.0.1:18971 (frontend nginx, loopback)
+#
+# 未作成（人間ゲート）: tunnel `civilpdf-stg` の作成・DNS レコード `civilpdf-stg` の追加
+#   cloudflared tunnel create civilpdf-stg   # -> <TUNNEL_ID>
+# 参照: docs/architecture/ADR-0005-staging-environment.md §未決定 U-1
+#       docs/deployment/staging-environment.md
+#
+# 外部公開は Cloudflare Access のみ。bypass / everyone のポリシーを置かない (fail closed)。
+tunnel: <TUNNEL_ID>
+credentials-file: /home/<USER>/.cloudflared/<TUNNEL_ID>.json
+
+originRequest:
+  connectTimeout: 30s
+  noHappyEyeballs: false
+
+ingress:
+  - hostname: civilpdf-stg.mirai-dx-platform.com
+    service: http://localhost:18971
+  - service: http_status:404

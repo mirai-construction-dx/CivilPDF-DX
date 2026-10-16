@@ -1,0 +1,37 @@
+# =============================================================================
+# CivilPDF-DX — STAGING stack (system unit)
+# =============================================================================
+# 本番 unit civilpdf-dx.service の写し。compose project `civilpdf-stg` を起動/停止する。
+# 本番 (civilpdf-dx.service / project civilpdf-dx / :18970) とリソースを共有しない。
+#
+# インストール (root):
+#   sudo install -m 644 deploy/civilpdf-stg.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now civilpdf-stg.service
+#
+# 前提: 本番チェックアウトに docker-compose.staging.yml があり、
+#       .env.stg -> ~/.config/civilpdf/stg.env (0600) が用意されていること。
+#
+# 外部公開は Cloudflare Tunnel `civilpdf-stg` + Access のみ（未作成＝人間ゲート）。
+# 参照: docs/deployment/staging-environment.md
+# =============================================================================
+
+[Unit]
+Description=CivilPDF-DX Staging (Docker Compose: postgres+backend+frontend)
+Requires=docker.service
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=kensan
+WorkingDirectory=/home/kensan/Projects/Mirai-Construction-DX/CivilPDF-DX
+# Compose の変数展開 (${POSTGRES_PASSWORD:?} 等) は project の .env ではなく
+# .env.stg を使う。prod checkout の .env (本番秘密) を誤って読まないための明示。
+Environment=COMPOSE_ENV_FILES=.env.stg
+ExecStart=/usr/bin/docker compose -f docker-compose.staging.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.staging.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

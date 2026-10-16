@@ -167,20 +167,21 @@ https://civilpdf-mvp.mirai-dx-platform.com/
 
 ## 📚 詳細資料（関係部門向け）
 
-| 資料                       | 対象                         | リンク                                                                                             |
-| -------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| 🖥️ **IT 部門向けガイド**   | システム担当者・インフラ担当 | [docs/for-it-staff.md](docs/for-it-staff.md)                                                       |
-| 🔧 **技術スタック詳細**    | エンジニア・開発者           | [docs/tech-stack.md](docs/tech-stack.md)                                                           |
-| 📋 **要件定義書**          | PM・管理職                   | [docs/requirements.md](docs/requirements.md)                                                       |
-| 🏗️ **システム構成図**      | アーキテクト・IT担当         | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md)               |
-| ⚙️ **運用 Runbook**        | 運用管理者・IT担当           | [docs/operations/runbook.md](docs/operations/runbook.md)                                           |
+| 資料                        | 対象                         | リンク                                                                                                       |
+| --------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 🖥️ **IT 部門向けガイド**    | システム担当者・インフラ担当 | [docs/for-it-staff.md](docs/for-it-staff.md)                                                                 |
+| 🔧 **技術スタック詳細**     | エンジニア・開発者           | [docs/tech-stack.md](docs/tech-stack.md)                                                                     |
+| 📋 **要件定義書**           | PM・管理職                   | [docs/requirements.md](docs/requirements.md)                                                                 |
+| 🏗️ **システム構成図**       | アーキテクト・IT担当         | [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md)                         |
+| ⚙️ **運用 Runbook**         | 運用管理者・IT担当           | [docs/operations/runbook.md](docs/operations/runbook.md)                                                     |
 | 🔁 **承認の差戻し・再申請** | 設計・開発                   | [docs/architecture/workflow-return-resubmit-design.md](docs/architecture/workflow-return-resubmit-design.md) |
-| 🚀 **本番デプロイ手順**    | IT担当・インフラ             | [docs/deployment/docker-production-deployment.md](docs/deployment/docker-production-deployment.md) |
-| 📦 **アプリ配信運用**      | IT担当・配布管理             | [docs/deployment/app-distribution.md](docs/deployment/app-distribution.md)                         |
-| 📋 **WebUI 画面一覧**      | PM・現場担当                 | [docs/webui-screens.md](docs/webui-screens.md)                                                     |
-| 🧪 **MVP プレビュー環境**  | 評価者・関係者               | [docs/deployment/mvp-preview-environment.md](docs/deployment/mvp-preview-environment.md)           |
-| 🪟 **Windows 11 展開手順** | IT部門                       | [docs/windows-deployment.md](docs/windows-deployment.md)                                           |
-| 📋 **コンプライアンス**    | 法務・監査                   | [docs/compliance.md](docs/compliance.md)                                                           |
+| 🚀 **本番デプロイ手順**     | IT担当・インフラ             | [docs/deployment/docker-production-deployment.md](docs/deployment/docker-production-deployment.md)           |
+| 📦 **アプリ配信運用**       | IT担当・配布管理             | [docs/deployment/app-distribution.md](docs/deployment/app-distribution.md)                                   |
+| 📋 **WebUI 画面一覧**       | PM・現場担当                 | [docs/webui-screens.md](docs/webui-screens.md)                                                               |
+| 🧪 **MVP プレビュー環境**   | 評価者・関係者               | [docs/deployment/mvp-preview-environment.md](docs/deployment/mvp-preview-environment.md)                     |
+| 🧪 **staging 環境**         | 運用・開発                   | [docs/deployment/staging-environment.md](docs/deployment/staging-environment.md)                             |
+| 🪟 **Windows 11 展開手順**  | IT部門                       | [docs/windows-deployment.md](docs/windows-deployment.md)                                                     |
+| 📋 **コンプライアンス**     | 法務・監査                   | [docs/compliance.md](docs/compliance.md)                                                                     |
 
 ---
 

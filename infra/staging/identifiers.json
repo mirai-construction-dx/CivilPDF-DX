@@ -1,0 +1,77 @@
+{
+  "$comment": "CivilPDF-DX staging 環境の識別子の正本 (single source of truth)。決定は docs/architecture/ADR-0005-staging-environment.md (Conforms-to: MCDX-ADR-0010)。更新は ADR の改訂と同時に行うこと。production ブロックは staging が共有してはならない本番側の値で、テストは staging 側がこれらと一致しないことを要求する。",
+  "environment": "staging",
+  "fqdn": "civilpdf-stg.mirai-dx-platform.com",
+  "url": "https://civilpdf-stg.mirai-dx-platform.com",
+  "zone": "mirai-dx-platform.com",
+  "tunnelName": "civilpdf-stg",
+  "tunnelId": null,
+  "tunnelConfigPath": "~/.cloudflared/civilpdf-stg-config.yml",
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 18971
+  },
+  "composeProject": "civilpdf-stg",
+  "composeFile": "docker-compose.staging.yml",
+  "envFile": "~/.config/civilpdf/stg.env",
+  "repoEnvExample": ".env.stg.example",
+  "databaseName": "civilpdf_stg",
+  "volumes": {
+    "postgres": "stg_postgres_data",
+    "uploads": "stg_uploaded_files"
+  },
+  "units": {
+    "app": "civilpdf-stg.service",
+    "tunnel": "civilpdf-stg-cloudflared.service"
+  },
+  "seedScript": "scripts/seed_demo_data.py",
+  "smokeScript": "scripts/staging-smoke.py",
+  "access": {
+    "application": "civilpdf-stg",
+    "policy": "本番 application の policy を流用しない。bypass / everyone を置かない (fail closed)。",
+    "status": "not-created"
+  },
+  "production": {
+    "$comment": "staging が共有してはならない本番側の識別子。",
+    "fqdn": "civilpdf.mirai-dx-platform.com",
+    "url": "https://civilpdf.mirai-dx-platform.com",
+    "composeProject": "civilpdf-dx",
+    "composeFile": "docker-compose.prod.yml",
+    "port": 18970,
+    "databaseName": "civilpdf",
+    "envFile": "~/.config/civilpdf/civilpdf.env",
+    "tunnelName": "civilpdf-dx",
+    "tunnelConfigPath": "~/.cloudflared/civilpdf-dx-config.yml",
+    "tunnelId": "ff8f3d70-e50a-437f-872f-962aff79e926",
+    "units": {
+      "app": "civilpdf-dx.service",
+      "tunnel": "civilpdf-dx-cloudflared.service"
+    }
+  },
+  "pendingHumanPatches": [
+    {
+      "id": "stg-0001-tunnel-create",
+      "purpose": "staging 用 Cloudflare Tunnel `civilpdf-stg` を作成し tunnelId を確定する。cloudflared tunnel create は本番 zone への作成を伴う人間ゲート。",
+      "owner": "human kensan",
+      "blockedBy": "ADR-0005 U-1"
+    },
+    {
+      "id": "stg-0002-dns-record",
+      "purpose": "DNS レコード civilpdf-stg -> <tunnel-id>.cfargotunnel.com (proxied) を追加する。MCDX-ADR-0004 決定 3 の Approval PR 対象。",
+      "owner": "human kensan",
+      "blockedBy": "ADR-0005 U-1"
+    },
+    {
+      "id": "stg-0003-access-app",
+      "purpose": "staging 専用 Cloudflare Access application `civilpdf-stg` とポリシーを作成する。bypass / everyone を置かない。",
+      "owner": "human kensan",
+      "blockedBy": "ADR-0005 U-2"
+    },
+    {
+      "id": "stg-0004-secret-values",
+      "purpose": "~/.config/civilpdf/stg.env (0600) を作成し、SECRET_KEY / TIMESTAMP_HMAC_KEY / POSTGRES_PASSWORD 等の実値を投入する。値はリポジトリへ置かない。",
+      "owner": "human kensan",
+      "blockedBy": "ADR-0005 U-3"
+    }
+  ]
+}

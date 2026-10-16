@@ -133,6 +133,7 @@ def health_check():
         "status": "ok",
         "app": settings.app_name,
         "version": settings.app_version,
+        "environment": settings.environment,
     }
 
 

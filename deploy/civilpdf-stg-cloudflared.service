@@ -1,0 +1,29 @@
+# =============================================================================
+# CivilPDF-DX — STAGING Cloudflare Tunnel (system unit)
+# =============================================================================
+# 本番 civilpdf-dx-cloudflared.service の写し。ただし tunnel は別 (`civilpdf-stg`)。
+# tunnel id / Access application / DNS レコードは未作成（人間ゲート）。
+# 参照: docs/architecture/ADR-0005-staging-environment.md §未決定 U-1/U-2
+#
+# インストール (root):
+#   sudo install -m 644 deploy/civilpdf-stg-cloudflared.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now civilpdf-stg-cloudflared.service
+#
+# 前提: ~/.cloudflared/civilpdf-stg-config.yml (deploy/civilpdf-stg-cloudflared-config.yml.example)
+#       と credentials JSON。作成されるまで起動しないこと (fail closed)。
+# =============================================================================
+
+[Unit]
+Description=CivilPDF-DX Staging Cloudflare Tunnel (civilpdf-stg.mirai-dx-platform.com)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kensan
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate --config /home/kensan/.cloudflared/civilpdf-stg-config.yml tunnel run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
