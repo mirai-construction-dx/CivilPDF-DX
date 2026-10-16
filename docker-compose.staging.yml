@@ -1,0 +1,129 @@
+# =============================================================================
+# CivilPDF-DX — STAGING Docker Compose
+# =============================================================================
+# 本番 (docker-compose.prod.yml) の写し (mirror)。形状は本番と同じで、値だけを
+# staging 用に分離する。決定は docs/architecture/ADR-0005-staging-environment.md
+# (Conforms-to: MCDX-ADR-0010)、識別子の正本は infra/staging/identifiers.json。
+#
+#   project : civilpdf-stg      (本番 civilpdf-dx とは別プロジェクト)
+#   listen  : 127.0.0.1:18971   (LOOPBACK ONLY — LAN へ公開しない。本番は 18970)
+#   db/backend : ホストへ一切ポート公開しない
+#   db      : PostgreSQL 16 / database `civilpdf_stg` / volume `stg_postgres_data`
+#   uploads : volume `stg_uploaded_files`
+#   data    : scripts/seed_demo_data.py の架空デモデータのみ（実データを入れない）
+#
+# secrets:
+#   NEVER put production secrets here. 値はリポジトリに置かず `~/.config/civilpdf/stg.env`
+#   (mode 0600) を正本とし、`.env.stg` からシンボリックリンクする:
+#     ln -s ~/.config/civilpdf/stg.env .env.stg
+#
+# Usage:
+#   ln -s ~/.config/civilpdf/stg.env .env.stg   # or: cp .env.stg.example .env.stg
+#   docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
+#   BASE_URL=http://127.0.0.1:18971 python scripts/staging-smoke.py
+#
+# NOTE: --env-file .env.stg is required. Compose expands ${POSTGRES_PASSWORD:?} from the
+# project .env (which is PRODUCTION's env in the prod checkout), so staging must point
+# Compose at .env.stg explicitly to avoid reading prod secrets / failing closed.
+# (COMPOSE_ENV_FILES=.env.stg has the same effect; the systemd unit uses it.)
+#
+# 外部公開は Cloudflare Tunnel `civilpdf-stg` + Access のみ（未作成＝人間ゲート）。
+# Access が用意できない間は公開しない (fail closed)。
+# =============================================================================
+
+name: civilpdf-stg
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-civilpdf_stg}
+      POSTGRES_USER: ${POSTGRES_USER:-civilpdf_stg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (see .env.stg.example / ~/.config/civilpdf/stg.env)}
+    volumes:
+      - stg_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-civilpdf_stg} -d ${POSTGRES_DB:-civilpdf_stg}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - stg
+
+  backend:
+    build:
+      context: src/console/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # .env.stg -> ~/.config/civilpdf/stg.env (0600)。本番の .env を流用しない。
+    env_file:
+      - .env.stg
+    environment:
+      # DATABASE_URL は compose 側で組み立て、db サービスを必ず指す（.env.stg の値より優先）
+      DATABASE_URL: postgresql://${POSTGRES_USER:-civilpdf_stg}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-civilpdf_stg}
+      ENVIRONMENT: staging
+      DEBUG: "false"
+      UPLOAD_DIR: /app/uploads
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # アップロード実体は backend が /app/uploads に書き込む（本番と同じ形状）。
+      - stg_uploaded_files:/app/uploads
+      # 架空デモデータのみを投入する（実データを入れない）。
+      - ./scripts/seed_demo_data.py:/scripts/seed_demo_data.py:ro
+    # 起動時に Alembic マイグレーションを適用し、架空デモデータを投入してから
+    # uvicorn を起動する（本番は upgrade head まで。stg だけ seed を足す）。
+    command: >
+      sh -c "alembic upgrade head &&
+             python /scripts/seed_demo_data.py &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - stg
+
+  frontend:
+    build:
+      context: src/console/frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # LOOPBACK ONLY。本番 (18970) と衝突しない 18971 番のみを公開する。
+      - "127.0.0.1:${FRONTEND_PORT:-18971}:80"
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - stg
+
+volumes:
+  stg_postgres_data:
+  stg_uploaded_files:
+
+networks:
+  stg:
+    driver: bridge

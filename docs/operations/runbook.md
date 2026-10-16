@@ -8,22 +8,24 @@
 
 ## 1. 本番構成の一覧（2026-09-18 実測）
 
-| 項目 | 値 |
-|---|---|
-| 公開 URL | `https://civilpdf.mirai-dx-platform.com/` |
-| TLS | Cloudflare（エッジで終端。オリジンは 127.0.0.1 のみバインド） |
-| アプリ本体 | **docker compose スタック**（`docker-compose.prod.yml`・db + backend + frontend の3コンテナ） |
-| Frontend | nginx + SPA + `/api/` リバースプロキシ（`127.0.0.1:18970`） |
-| Backend | uvicorn ×N（コンテナ内 8000。起動時に `alembic upgrade head` を適用） |
-| DB | **PostgreSQL 16**（compose `db` コンテナ・named volume・**ホストにポート未公開**）。運用は [local-postgresql.md](../deployment/local-postgresql.md) |
-| アップロード | named volume `uploaded_files`（コンテナ内 `/app/uploads`） |
-| スタック制御 | system unit `civilpdf-dx.service`（`/etc/systemd/system/`） |
-| Tunnel | cloudflared（system unit `civilpdf-dx-cloudflared.service` / `~/.cloudflared/civilpdf-dx-config.yml` → `127.0.0.1:18970`） |
-| 環境設定 | `<production checkout>/.env`（git 管理外・compose 用）＋ `~/.config/civilpdf/civilpdf.env`（運用スクリプト用・0600） |
-| バージョン | 正本はリポジトリ `VERSION`（現在 0.10.0）。`APP_VERSION` でデプロイ時上書き。整合検証は `scripts/verify-version-sync.sh` |
+| 項目         | 値                                                                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 公開 URL     | `https://civilpdf.mirai-dx-platform.com/`                                                                                                           |
+| TLS          | Cloudflare（エッジで終端。オリジンは 127.0.0.1 のみバインド）                                                                                       |
+| アプリ本体   | **docker compose スタック**（`docker-compose.prod.yml`・db + backend + frontend の3コンテナ）                                                       |
+| Frontend     | nginx + SPA + `/api/` リバースプロキシ（`127.0.0.1:18970`）                                                                                         |
+| Backend      | uvicorn ×N（コンテナ内 8000。起動時に `alembic upgrade head` を適用）                                                                               |
+| DB           | **PostgreSQL 16**（compose `db` コンテナ・named volume・**ホストにポート未公開**）。運用は [local-postgresql.md](../deployment/local-postgresql.md) |
+| アップロード | named volume `uploaded_files`（コンテナ内 `/app/uploads`）                                                                                          |
+| スタック制御 | system unit `civilpdf-dx.service`（`/etc/systemd/system/`）                                                                                         |
+| Tunnel       | cloudflared（system unit `civilpdf-dx-cloudflared.service` / `~/.cloudflared/civilpdf-dx-config.yml` → `127.0.0.1:18970`）                          |
+| 環境設定     | `<production checkout>/.env`（git 管理外・compose 用）＋ `~/.config/civilpdf/civilpdf.env`（運用スクリプト用・0600）                                |
+| バージョン   | 正本はリポジトリ `VERSION`（現在 0.10.0）。`APP_VERSION` でデプロイ時上書き。整合検証は `scripts/verify-version-sync.sh`                            |
 
 > **旧構成（ホスト直 uvicorn 8180 + vite preview 5182）は 2026-09-18 に退役。**
 > 退役手順は §2.1 を参照。
+>
+> 🧪 **staging 環境**（本番前検証・loopback 18971）は [docs/deployment/staging-environment.md](../deployment/staging-environment.md)。
 
 ## 2. デプロイ手順（新リリース）
 
@@ -35,6 +37,7 @@
 ## 3. バックアップと復旧
 
 ### バックアップ
+
 - `deploy/civilpdf-backup.timer` が毎日 02:30 JST に `deploy/civilpdf-backup.service` を起動
 - 保存先: `~/civildx-backups/<UTCタイムスタンプ>/`
   - compose 本番（現行）: `civilpdf.dump`（db コンテナ内 pg_dump・版数は必然一致）＋ `uploads.tar.gz`（backend コンテナ内 named volume の tar）＋ `civilpdf.env`（compose の .env・0600）
@@ -45,6 +48,7 @@
 - RTO: 目標 30 分（復旧手順は下記）
 
 #### バックアップの成否判定（重要）
+
 `scripts/backup-production.sh` は次の 3 点を保証します。監視・手動確認もこの基準で行ってください。
 
 1. **アトミック公開**: 内容は隠しディレクトリ `.incomplete-<stamp>` に作成し、ダンプ検証後にのみ公開名へリネームします。
@@ -66,6 +70,7 @@
 > `pg_dump`/`pg_restore` は**サーバーと同じメジャー**が必要です（同ガイド「🔴」節を参照）。
 
 ### 復旧手順（compose 本番）
+
 1. cd <production checkout> && docker compose -f docker-compose.prod.yml stop backend
 2. DB 復元: cat ~/civildx-backups/<stamp>/civilpdf.dump | docker compose -f docker-compose.prod.yml exec -T db pg_restore -U civilpdf -d civilpdf --clean --if-exists --no-owner
 3. uploads 復元: cat ~/civildx-backups/<stamp>/uploads.tar.gz | docker compose -f docker-compose.prod.yml exec -T backend tar xzf - -C /app/uploads
@@ -93,6 +98,7 @@
 - 監視ログ: `~/.local/state/civildx-monitor/monitor.log`
 
 ### 手動確認コマンド
+
 ```bash
 # DB 到達性（本番は 200、DB 障害時は 503）
 docker compose -f docker-compose.prod.yml exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=10)"

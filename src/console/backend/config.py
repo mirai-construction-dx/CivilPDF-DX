@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     app_version: str = "0.10.0"
     debug: bool = False
 
+    # 環境識別子。staging は "staging"（development / test と同じ値を使わない）。
+    # /health がこの値を返し、監視・スモークが環境の取り違えを検出する。
+    environment: str = "development"
+
     # MVP 公開デモ用のログイン認証バイパス。true のとき、トークン無しの
     # リクエストをデモ用の管理ユーザーとして扱う（＝ログイン画面を出さない）。
     # 既定は False で、環境変数 AUTH_BYPASS=true を明示した環境でのみ有効。
