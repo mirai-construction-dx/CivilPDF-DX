@@ -93,6 +93,20 @@ def _assert_can_delete(doc: Document, user: User) -> None:
         )
 
 
+def _assert_can_modify_document(doc: Document, user: User) -> None:
+    """Raise 403 unless the user may change or remove this document.
+
+    Visibility (``assert_document_visible``) only answers "may this user see
+    it". Every state-changing document endpoint must additionally require the
+    owner, a manager or an admin — otherwise any project member could archive,
+    restore or re-type somebody else's document.
+    """
+    if doc.owner_id != user.id and user.role.value not in ("admin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+
 @router.get("/", response_model=None)
 def list_documents(
     project_id: Optional[str] = Query(None),
@@ -421,12 +435,22 @@ def update_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
     _assert_not_trashed(doc)
-    if doc.owner_id != current_user.id and current_user.role.value not in (
-        "admin",
-        "manager",
+    _assert_can_modify_document(doc, current_user)
+
+    # The document type decides the electronic-delivery folder and file prefix
+    # (services/electronic_delivery_service.py _FOLDER_MAP). Once a document is
+    # approved, re-typing it would silently change what a past delivery
+    # contained, so that change has to go through the approval flow instead.
+    if body.document_type is not None and doc.status in (
+        DocumentStatus.APPROVED,
+        DocumentStatus.FINALIZED,
     ):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Document type is fixed after approval; return the document "
+                "through the approval workflow to re-type it"
+            ),
         )
 
     for field, value in body.model_dump(exclude_none=True).items():
@@ -519,13 +543,7 @@ async def apply_timestamp(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
     _assert_not_trashed(doc)
-    if doc.owner_id != current_user.id and current_user.role.value not in (
-        "admin",
-        "manager",
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
+    _assert_can_modify_document(doc, current_user)
     if not doc.file_path or not Path(doc.file_path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
@@ -628,6 +646,7 @@ def delete_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
     _assert_can_delete(doc, current_user)
+    _assert_can_modify_document(doc, current_user)
 
     if doc.deletion_requested_at is not None:
         # B-4: idempotent. Keep the first deletion request time (the 30-day
@@ -670,6 +689,7 @@ def restore_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     assert_document_visible(doc, current_user)
     _assert_can_delete(doc, current_user)
+    _assert_can_modify_document(doc, current_user)
     if doc.deletion_requested_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

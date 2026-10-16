@@ -793,18 +793,17 @@ class TestElectronicDelivery:
         )
         return project
 
-    def test_two_generations_are_reproducible_except_time(
+    def test_two_generations_are_byte_reproducible(
         self, client, admin_token, manager_token, manager_user, db_session
     ):
         """仕様: README.md 行104（INDEX.XML・フォルダ構成）／再現性の記録.
 
-        期待: 同一入力で2回 ZIP を生成すると、ファイル名一覧・各エントリ内容・
-        INDEX.XML（作成日を除く）が一致する。
-        記録（時刻依存部分）: ルートフォルダ名 ``{CODE}_{YYYYMMDD}``、INDEX.XML の
-        ``作成日``、Content-Disposition のファイル名は生成日時由来
-        （services/electronic_delivery_service.py:44,134,210-213）。ZIP エントリの
-        date_time は ``zipfile.writestr`` が壁時計から付与するため generated_at を
-        固定しても制御されず、ZIP バイト列の完全一致は保証されない。
+        期待: 同一入力・同一生成時刻で2回 ZIP を生成すると、ファイル名一覧・
+        各エントリ内容・INDEX.XML（作成日を除く）に加え、ZIP エントリの時刻も
+        一致する。パッケージ日（ルートフォルダ名 ``{CODE}_{YYYYMMDD}``・INDEX.XML
+        の ``作成日``・Content-Disposition のファイル名）は生成日時由来。
+        ``generate_delivery_zip`` は ZIP エントリの date_time も generated_at に
+        固定するため（#160）、generated_at を固定すればバイト列まで再現する。
         """
         project = self._setup(client, db_session, admin_token, manager_user)
         url = f"{API}/projects/{project.id}/electronic-delivery"
@@ -831,8 +830,8 @@ class TestElectronicDelivery:
         assert _strip_creation_date(index) == _strip_creation_date(
             z2.read(names[0]).decode("utf-8")
         )
-        # ZIP エントリの時刻は generated_at（2001年）ではなく壁時計由来
-        assert all(info.date_time[0] != 2001 for info in z1.infolist())
+        expected_entry_time = FIXED_DELIVERY_TIME.timetuple()[:6]
+        assert all(info.date_time == expected_entry_time for info in z1.infolist())
 
     def test_creation_date_changes_with_generation_date(
         self, client, admin_token, manager_token, manager_user, db_session

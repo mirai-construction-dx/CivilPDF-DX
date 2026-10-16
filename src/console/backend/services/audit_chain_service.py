@@ -223,6 +223,7 @@ def verify_chain(db: Session, limit: Optional[int] = None) -> dict:
     - chain_valid: bool — no break found in the records checked
     - records_checked: int
     - first_broken_sequence: int | None
+    - unchained_records: int (rows with no sequence_number; outside the chain)
     - error: str | None
     - total_records: int — chained records counted when the call began
     - complete: bool — True when every record counted at the start of the
@@ -238,11 +239,21 @@ def verify_chain(db: Session, limit: Optional[int] = None) -> dict:
     )
     target = total if limit is None else min(limit, total)
 
+    # Rows written before they were chained (or by a path that forgot to chain)
+    # carry no sequence_number. verify_chain only recomputes the chained rows, so
+    # a bare "chain_valid: true" would hide them: count them and surface the
+    # number so an operator can see the coverage gap instead of trusting a green
+    # result. They are never silently included in the chain.
+    unchained_rows = (
+        db.query(AuditLog).filter(AuditLog.sequence_number == None).count()  # noqa: E711
+    )
+
     def _result(valid: bool, checked: int, broken, error) -> dict:
         return {
             "chain_valid": valid,
             "records_checked": checked,
             "first_broken_sequence": broken,
+            "unchained_records": unchained_rows,
             "error": error,
             "total_records": total,
             "complete": checked >= total,

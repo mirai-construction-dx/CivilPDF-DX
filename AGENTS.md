@@ -25,6 +25,21 @@ python -m pytest -q tests   # CI は tests/console を --cov-fail-under=80 付�
 cd src/console/frontend && npm ci && npm run lint && npm run format:check && npm test && npm run build
 ```
 
+CI にはこのほかに、**PR 前に把握しておくべきジョブ**がある（`.github/workflows/ci.yml`）。
+
+| ジョブ | 内容 | ローカルでの代替 |
+| --- | --- | --- |
+| Backend Migrations (fresh DB) | PostgreSQL 16 で `alembic upgrade head` → スキーマ整合 → `test_enum_parity.py` | migration を足したら `pytest tests/console/test_migrations.py` を必ず実行 |
+| Backend Security Scan | `pip-audit -r requirements.txt` | `pip-audit`（依存を上げたら必須） |
+| Frontend Dependency Audit | `npm audit --audit-level=high` | `npm audit`（ロックファイルを触ったら必須） |
+| Frontend E2E (Playwright) | `npm run test:e2e`（chromium） | `npx playwright install chromium` のうえ実行 |
+| Backend Tests (Windows 11) | Windows で `pytest tests/console -x` | ローカルでは不可（CI のみ） |
+| Ops Docs / Script / Version Sync | `bash -n`・shellcheck・`scripts/verify-version-sync.sh` | スクリプト変更時は `bash -n` と shellcheck |
+| Secret Scan (gitleaks) | 追跡全体をスキャン | `gitleaks detect`（設定は `.gitleaks.toml`） |
+
+> 💡 `npm run format:check` は `prettier` が `node_modules` に無いと `prettier: not found` で落ちる。
+> `npm ci` を実行してから使う（`npm audit fix` でも devDependencies が揃う）。
+
 ## 守ること
 
 - 🚫 `main` への直接 push・force push・履歴の書き換えは禁止。変更はブランチ → PR → 必須 CI → squash merge

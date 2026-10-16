@@ -70,7 +70,13 @@ https://<your-domain>/api/v1/
 | GET | `/api/v1/workflows/` | ワークフロー一覧 |
 | POST | `/api/v1/workflows/` | ワークフロー作成（多段階・順序強制） |
 | GET | `/api/v1/workflows/{workflow_id}` | ワークフロー詳細 |
-| POST | `/api/v1/workflows/{workflow_id}/steps/{step_id}/decide` | 承認/却下決定 |
+| POST | `/api/v1/workflows/{workflow_id}/steps/{step_id}/decide` | 承認/却下/差戻し決定（`decision`: `approve` / `reject` / `return`） |
+| POST | `/api/v1/workflows/{workflow_id}/resubmit` | 差戻し後の再申請（起票者または admin。`workflow.status` が `returned` のときのみ） |
+
+> 🔁 **差戻し・再申請（WEB-WF-005）**: `return` はステップ・ワークフローを `returned`、文書を `draft` に戻し、起票者へ理由つきで通知する。
+> 先行ステップに承認済みがある場合は 409（承認済みの巻き戻しは未対応）。`returned` の間は `decide` を 409 で拒否し、`/resubmit` で全ステップを `pending` に戻して先頭から再開する。
+> 監査アクションは差戻しが `workflow.step.returned`、再申請が `workflow.resubmitted`。`approve` / `reject` は従来どおり `workflow.step.decided`。
+> 設計と決定: [../architecture/workflow-return-resubmit-design.md](../architecture/workflow-return-resubmit-design.md)
 
 ### プロジェクト / 電子納品
 
@@ -94,7 +100,7 @@ https://<your-domain>/api/v1/
 |---|---|---|
 | GET | `/api/v1/audit-logs/` | 監査ログ一覧（管理者・ページネーション/フィルタ） |
 | GET | `/api/v1/audit-logs/export.csv` | 監査ログ CSV 出力（管理者・出力自体も監査） |
-| GET | `/api/v1/audit-logs/verify` | 監査チェーン検証（管理者） |
+| GET | `/api/v1/audit-logs/verify` | 監査チェーン検証（管理者）。応答: `chain_valid` / `records_checked` / `first_broken_sequence` / **`unchained_records`**（連鎖していない行の件数。0 でない場合、`chain_valid=true` でも監査の一部が検証対象外） / `error` |
 | GET | `/api/v1/stats/` | 全体統計 |
 | GET | `/api/v1/stats/security` | セキュリティイベント統計（管理者） |
 | GET | `/api/v1/stats/security-config` | セキュリティ設定統計 |
@@ -154,7 +160,7 @@ https://<your-domain>/api/v1/
 | GET | `/api/v1/documents/{doc_id}/review-sidecar` | Editor レビュー情報取得 |
 | POST | `/api/v1/documents/{doc_id}/flatten-check` | 平坦化チェック |
 | POST | `/api/v1/documents/{doc_id}/editor-events` | Editor イベント記録 |
-| GET | `/api/v1/documents/{doc_id}/workflow-status` | Editor 向けワークフロー状態 |
+| GET | `/api/v1/documents/{doc_id}/workflow-status` | Editor 向けワークフロー状態（`status` は `pending` / `in_progress` / `approved` / `rejected` / `returned` をとりうる） |
 | POST | `/api/v1/documents/{doc_id}/revisions` | リビジョン追加 |
 | GET | `/api/v1/documents/{doc_id}/revisions` | リビジョン一覧 |
 | DELETE | `/api/v1/privacy/users/{user_id}/data` | GDPR 削除権（論理削除→猶予後物理削除） |

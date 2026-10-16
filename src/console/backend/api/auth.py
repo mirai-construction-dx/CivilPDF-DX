@@ -12,7 +12,6 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User, UserRole, UserStatus
-from models.audit_log import AuditLog
 from auth.jwt import (
     verify_password,
     get_password_hash,
@@ -136,16 +135,21 @@ def _log_audit(
     detail: str,
     ip: str | None,
 ) -> None:
-    db.add(
-        AuditLog(
-            user_id=user_id,
-            action=action,
-            resource_type="auth",
-            detail=detail,
-            ip_address=ip,
-        )
+    """Record an authentication event on the tamper-evident hash chain.
+
+    These rows used to be inserted without sequence_number/prev_hash/record_hash,
+    so verify_chain skipped them: SSO logins (the main path in production) were
+    outside the tamper detection the requirements promise. chain linkage only —
+    the caller keeps committing its own transaction.
+    """
+    create_chained_audit_log(
+        db,
+        user_id=user_id,
+        action=action,
+        resource_type="auth",
+        detail=detail,
+        ip_address=ip,
     )
-    db.commit()
 
 
 @router.post("/token", response_model=TokenResponse)

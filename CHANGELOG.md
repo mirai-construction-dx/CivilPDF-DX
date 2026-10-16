@@ -8,6 +8,47 @@
 
 ## [Unreleased]
 
+### 追加
+
+- 🔁 承認ワークフローの **差戻し** と **再申請**（WEB-WF-005）
+  - `POST /api/v1/workflows/{id}/steps/{sid}/decide` の `decision` に `return` を追加。差戻しではステップとワークフローが `returned` になり、文書は再編集可能な `draft` へ戻る（`completed_at` はクリア）。**差戻し中（`returned`）は再申請するまで `decide` を 409 で拒否**し、差戻しが承認操作で無効化されないようにする
+  - `POST /api/v1/workflows/{id}/resubmit` を追加。起票者または admin が再申請すると全ステップが `pending` に戻り、文書は `pending_review`、先頭承認者へ通知
+  - 差戻し時に起票者へ理由つきアプリ内通知。監査ログに `workflow.step.returned` / `workflow.resubmitted` を追記（`approve` / `reject` は従来どおり `workflow.step.decided`）
+  - 既存の `approve` / `reject` の挙動は不変（`reject` は従来どおり終端）
+  - **DB migration は不要**（新カラム・新 enum 値なし）。仕様と決定の根拠: [docs/architecture/workflow-return-resubmit-design.md](docs/architecture/workflow-return-resubmit-design.md)
+  - 制限: 先行ステップが承認済みの場合の巻き戻し（任意ステップへの差戻し）は未対応。該当操作は 409
+
+### 修正・強化（2026-10-10 品質テスト第4バッチ）
+
+- 🔗 **SSO の認証行をハッシュチェーンへ移行**。`api/auth.py` の `_log_audit` は `sequence_number` / `prev_hash` / `record_hash` を付けずに INSERT していたため、`verify_chain` の対象外（＝改ざん検知の外）だった。M365 ブリッジと OIDC の成功・失敗・プロビジョニング（15 箇所）を `create_chained_audit_log` に統一
+- 🧾 **`verify_chain` が未連鎖行の件数を返す**。`unchained_records` を応答に追加（`ChainVerifyResponse` も更新）。連鎖外の行があっても `chain_valid: true` だけでは見えなかったギャップを可視化する
+- 🔐 **AI 設定・M365 資格情報の変更をチェーン監査に記録**（`ai.config.updated` / `m365.config.updated`）。従来は `middleware/audit.py` の平文ログのみだった。**API キー・クライアントシークレットの値は記録せず**、変更の有無（`api_key_changed` / `client_secret_changed`）と有無フラグのみを残す
+- ⚡ **検索の FTS 件数比較を軽量化**。SQLite 経路の `COUNT(*) FROM documents_fts` は FTS5 の全文走査になり得たため `COUNT(rowid)` に変更（行は文書 id をキーに持つため同値）
+- 🧪 品質テストを 35 → 39 件へ拡充（設定変更の監査と秘密値の非記録、未連鎖行の可視化、M365 認証行の連鎖）
+- 🧪 テスト環境に `M365_FERNET_KEY`（固定のテスト専用キー）を設定し、暗号化経路を通すテストを可能にした
+
+### 修正・強化（2026-10-10 品質テスト第3バッチ）
+
+- 📄 **INDEX.XML に版と ISO 19650 メタデータを出力**。成果品情報のファイル情報へ `版`（`document.revision`）を追加し、ISO 19650 の命名項目（作成者コード・機能分類・情報形式・分野コード・連番）が設定されている文書は `ISO19650情報` として出力する。既存文書（メタデータ無し）の INDEX.XML は `<版 />` 以外変わらない
+- 🔁 **版番号の競合から自動復帰**。`max(version_number)+1` の採番が UNIQUE 制約（`uq_document_versions_number`）に衝突した場合、savepoint へロールバックし孤児ファイルを削除して再採番する（最大 3 回）。競合を作り出して再採番されることをテストで実測
+- 🧪 品質テストを 32 → 35 件へ拡充（INDEX.XML の版・ISO 19650、メタデータ無しの不変性、採番競合からの復帰）
+
+### 修正・強化（2026-10-10 品質テスト第2バッチ）
+
+- 🔒 **承認済み文書の種別を固定**。文書種別は電子納品のフォルダと接頭辞を決めるため、承認後に書き換えると「過去に納品した中身」が変わる。`APPROVED` / `FINALIZED` の文書で種別を変更しようとすると 409（タイトルの訂正は引き続き可能）
+- 📥 **承認済み文書へのレビュー sidecar 取込を拒否（409）**。`api/editor.py` は取込時に文書 status を `EDITOR_DRAFT` / `EDITOR_REVIEWED` に上書きするため、承認記録（approved）と文書状態が乖離し得た
+- 🔑 **`suspended` アカウントの取扱いをテストで固定**。ログイン不可と、発行済みトークンの失効後 403 を検証
+- 🧪 品質テストを 25 → 32 件へ拡充（承認後の変更統制、sidecar 取込の可否、suspended、flatten の `FINALIZED` 到達、多重ステップの現行仕様の記録）
+- 🛠️ `AGENTS.md` に CI 相当のジョブ表を追記（migration・pip-audit・npm audit・E2E・Windows・shellcheck・gitleaks とローカル代替）
+
+### 修正・強化（2026-10-10 品質テスト第1バッチ）
+
+- 🔐 **文書の削除・復元に所有者/ロール判定を追加**。従来は可視性（プロジェクトメンバー）だけで判定していたため、メンバーであれば viewer/engineer でも他者の文書をアーカイブ・復元できた。`update_document` / `apply_timestamp` と同じ「owner または admin/manager」に統一（判定は `_assert_can_modify_document` に集約）
+- 📦 **電子納品 ZIP の再現性を修正**。`generate_delivery_zip` が `generated_at` を受け取れるようにし、ZIP エントリの時刻を固定（`ZipInfo`）した。従来は内部で `datetime.now` を呼び、エントリ時刻も `time.localtime` 由来だったため、同一入力でも再納品のたびにバイトが変わっていた
+- 🧾 **リビジョンの PDF 実体を保存**。これまでメタデータのみで `file_path` が NULL のままだったため「旧版参照」が成立していなかった。実体を保存し、`GET /api/v1/documents/{id}/revisions/{version_number}/download` を追加（実体の無い旧版は 410）
+- 🔒 **版番号の一意性を DB で保証**。`document_versions (document_id, version_number)` に UNIQUE 制約を追加（migration `p6q7r8s9t0u1`）。既存重複は最大番号の上へ採番し直してから制約を作成
+- 🧪 品質テスト `tests/console/test_quality_business_flows.py`（25 件）を追加: 文書→承認、電子納品の再現性、保持期限の算定、監査チェーンの改ざん検知、権限境界（メンバーでも削除不可）、AI が種別・状態を書かないこと、版の実体保存、版番号の一意性
+
 ### 📝 ドキュメント・UI
 
 - 📝 仕様の決定事項を `docs/requirements.md` に反映（v1.1.0）。反映した決定事項: RBAC（manager の全件参照、承認者の条件、admin も承認者に指定可、ごみ箱からの復元権限）、ごみ箱（二重削除・30日後の物理削除・復元・ごみ箱中の承認操作禁止）、保存年数（契約書7年・図面10年、アップロード日起算）、文書閲覧の記録と操作種別名（`auth.login_success` 形式を正とする）、AT-DOC-005 を 404（存在秘匿）に修正、電子納品で文書0件を拒否、TSA 方針。未決事項（保存期限中の削除要求、その他の種別の保存年数、電子納品の準拠要領と版、監査ログの未実装列）は「未決」と明記
@@ -43,6 +84,7 @@
 
 - アプリ配信: 展開対象/KPI の実 MDM（Intune / Jamf）連携
 - PDF Editor デスクトップ本体 + ビルドパイプライン新規構築（Issue #62 / Scope B）
+- 承認ワークフロー: 先行ステップ承認後の差戻し（巻き戻し）仕様の確定 — 現状は 409 で拒否
 
 ---
 

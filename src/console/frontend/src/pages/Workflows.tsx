@@ -4,9 +4,11 @@ import {
   listWorkflows,
   getWorkflow,
   decideStep,
+  resubmitWorkflow,
   type WorkflowResponse,
   type ApprovalStep,
 } from "../api/workflows";
+import { getDocument } from "../api/documents";
 import { useAuthStore } from "../store/auth";
 import { useModalDialog } from "../hooks/useModalDialog";
 
@@ -14,13 +16,23 @@ const statusLabel: Record<string, { label: string; cls: string }> = {
   in_progress: { label: "審査中", cls: "bg-orange-100 text-orange-700" },
   approved: { label: "承認済", cls: "bg-green-100 text-green-700" },
   rejected: { label: "却下", cls: "bg-red-100 text-red-700" },
+  returned: { label: "差戻し", cls: "bg-amber-100 text-amber-700" },
 };
 
 const stepStatusLabel: Record<string, { label: string; cls: string }> = {
   pending: { label: "保留中", cls: "bg-yellow-100 text-yellow-700" },
   approved: { label: "承認", cls: "bg-green-100 text-green-700" },
   rejected: { label: "却下", cls: "bg-red-100 text-red-700" },
+  returned: { label: "差戻し", cls: "bg-amber-100 text-amber-700" },
 };
+
+/** API エラーの detail（403/409 等）があればそれを、無ければ文字列化して返す。 */
+function errorDetail(error: unknown): string {
+  const detail = (
+    error as { response?: { data?: { detail?: unknown } } } | null | undefined
+  )?.response?.data?.detail;
+  return typeof detail === "string" ? detail : String(error);
+}
 
 // ---------- WorkflowDetailModal ----------
 
@@ -41,14 +53,31 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
     queryFn: () => getWorkflow(workflowId),
   });
 
+  // 再申請の権限判定（設計 D10）: owner 判定のため文書を取得する。
+  const { data: doc } = useQuery({
+    queryKey: ["document", wf?.document_id],
+    queryFn: () => getDocument(wf!.document_id),
+    enabled: !!wf?.document_id,
+  });
+
   const decide = useMutation({
     mutationFn: ({
       stepId,
       decision,
     }: {
       stepId: string;
-      decision: "approve" | "reject";
+      decision: "approve" | "reject" | "return";
     }) => decideStep(workflowId, stepId, decision, comment || undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["workflow", workflowId] });
+      qc.invalidateQueries({ queryKey: ["workflows"] });
+      setComment("");
+      setActingStepId(null);
+    },
+  });
+
+  const resubmit = useMutation({
+    mutationFn: () => resubmitWorkflow(workflowId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workflow", workflowId] });
       qc.invalidateQueries({ queryKey: ["workflows"] });
@@ -60,6 +89,26 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
   function isMyPendingStep(step: ApprovalStep): boolean {
     return step.approver_id === currentUser?.id && step.status === "pending";
   }
+
+  // 差戻し中は再申請するまで decide を受け付けない（backend 契約）。
+  const isReturned = wf?.status === "returned";
+
+  // 差戻し可能条件（設計 D11）: 自分の pending ステップで、かつ
+  // 先行ステップ（order が小さい）に承認済みが無いこと。
+  // 差戻し中（returned）は再申請まで操作不可。
+  function canReturnStep(step: ApprovalStep): boolean {
+    if (isReturned || !isMyPendingStep(step)) return false;
+    return !(wf?.steps ?? []).some(
+      (s) => s.order < step.order && s.status === "approved",
+    );
+  }
+
+  // 再申請の表示条件（設計 D10）: 差戻し中で、admin または文書 owner。
+  // 権限判定（owner の文書取得）が終わるまでは非表示。
+  const canResubmit =
+    isReturned &&
+    !!currentUser &&
+    (currentUser.role === "admin" || doc?.owner_id === currentUser.id);
 
   return (
     <div
@@ -118,6 +167,27 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                 )}
               </div>
 
+              {/* 再申請（差戻し中のみ） */}
+              {wf.status === "returned" && canResubmit && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                  <p className="text-xs text-amber-800">
+                    差戻しされた承認依頼です。修正後に再申請できます。
+                  </p>
+                  <button
+                    onClick={() => resubmit.mutate()}
+                    disabled={resubmit.isPending}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+                  >
+                    再申請
+                  </button>
+                  {resubmit.error && (
+                    <p className="text-red-600 text-xs">
+                      {errorDetail(resubmit.error)}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Steps */}
               <h3 className="text-sm font-semibold text-gray-600 mb-3">
                 承認ステップ
@@ -131,7 +201,9 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                       label: step.status,
                       cls: "bg-gray-100 text-gray-600",
                     };
-                    const canAct = isMyPendingStep(step) && !decide.isPending;
+                    // 差戻し中（returned）は再申請まで承認・却下・差戻しを出さない。
+                    const canAct =
+                      isMyPendingStep(step) && !decide.isPending && !isReturned;
                     const isExpanded = actingStepId === step.id;
 
                     return (
@@ -175,7 +247,7 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                         </div>
 
                         {/* Inline action form */}
-                        {isExpanded && (
+                        {isExpanded && !isReturned && (
                           <div className="mt-3 border-t pt-3 space-y-2">
                             <textarea
                               rows={2}
@@ -209,6 +281,20 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                               >
                                 却下
                               </button>
+                              {canReturnStep(step) && (
+                                <button
+                                  onClick={() =>
+                                    decide.mutate({
+                                      stepId: step.id,
+                                      decision: "return",
+                                    })
+                                  }
+                                  disabled={decide.isPending}
+                                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-xs py-1.5 rounded transition-colors disabled:opacity-50"
+                                >
+                                  差戻し
+                                </button>
+                              )}
                               <button
                                 onClick={() => {
                                   setActingStepId(null);
@@ -221,7 +307,7 @@ function WorkflowDetailModal({ workflowId, onClose }: DetailModalProps) {
                             </div>
                             {decide.error && (
                               <p className="text-red-600 text-xs">
-                                {String(decide.error)}
+                                {errorDetail(decide.error)}
                               </p>
                             )}
                           </div>

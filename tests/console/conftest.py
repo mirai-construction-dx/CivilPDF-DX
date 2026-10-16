@@ -1,5 +1,6 @@
 """Shared test fixtures for console API tests."""
 
+import base64
 import shutil
 import sys
 import os
@@ -11,6 +12,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src/console/ba
 # strong test secrets when the app is imported with DEBUG=false.
 os.environ.setdefault("SECRET_KEY", "unit-test-secret-key-value-32bytes-minimum")
 os.environ.setdefault("TIMESTAMP_HMAC_KEY", "unit-test-hmac-key-value-32bytes-minimum")
+# Fernet key for the AI API key / M365 client secret encryption paths. A fixed
+# test-only key: the real one lives in the deployed .env and is never committed.
+os.environ.setdefault(
+    "M365_FERNET_KEY",
+    base64.urlsafe_b64encode(b"unit-test-fernet-key-32-bytes!!!").decode(),
+)
 
 # Keep uploads out of the deployed storage location. config.upload_dir defaults
 # to ~/civildx/uploads, which on this host is the *production* upload directory,
@@ -19,6 +26,18 @@ os.environ.setdefault("TIMESTAMP_HMAC_KEY", "unit-test-hmac-key-value-32bytes-mi
 # Assigned through os.environ (not a module-level variable) so the setup block
 # stays "allowed before imports" for ruff's E402 rule.
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="civilpdf-test-uploads-")
+
+# Keep the *app's own* engine off the deployed database. The fixture below only
+# overrides FastAPI's ``Depends(get_db)``; ``database.engine`` (used directly by
+# ``main.py`` for /health/ready) is built from ``DATABASE_URL`` at import time.
+# Running pytest from the repository root loads the deployed `.env`, so without
+# this the readiness test asserted the dialect of the real PostgreSQL instance
+# and ``test_enum_parity`` ran against a schema-less database. Assigned through
+# os.environ (not a module-level variable) so the setup block stays
+# "allowed before imports" for ruff's E402 rule, exactly like UPLOAD_DIR above.
+os.environ["DATABASE_URL"] = (
+    f"sqlite:///{tempfile.mkdtemp(prefix='civilpdf-test-db-')}/test_console.db"
+)
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,10 +50,9 @@ from auth.jwt import get_password_hash
 from middleware.rate_limit import reset_all
 from models.user import User, UserRole, UserStatus
 
-# One SQLite file per pytest process: a shared ./test_console.db let two concurrent
-# runs (e.g. a stale background run) drop each other's tables mid-test.
-_TEST_DB_DIR = tempfile.mkdtemp(prefix="civilpdf-test-db-")
-SQLALCHEMY_TEST_URL = f"sqlite:///{_TEST_DB_DIR}/test_console.db"
+# The app's engine was pointed at this URL before the imports above; the test
+# engine reuses it so both sides agree on one throwaway SQLite file per process.
+SQLALCHEMY_TEST_URL = os.environ["DATABASE_URL"]
 
 engine_test = create_engine(
     SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False}
@@ -48,7 +66,9 @@ def _cleanup_isolated_upload_dir():
     yield
     shutil.rmtree(os.environ.get("UPLOAD_DIR", ""), ignore_errors=True)
     engine_test.dispose()
-    shutil.rmtree(_TEST_DB_DIR, ignore_errors=True)
+    # Derive the throwaway directory from the URL the app's engine was given.
+    db_path = os.environ.get("DATABASE_URL", "").removeprefix("sqlite:///")
+    shutil.rmtree(os.path.dirname(db_path), ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

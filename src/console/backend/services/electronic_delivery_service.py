@@ -146,13 +146,46 @@ def _build_index_xml(
         for i, doc in enumerate(docs, start=1):
             file_el = ET.SubElement(folder_el, "ファイル情報")
             _sub(file_el, "ファイル名", f"{prefix}_{i:04d}.PDF")
-            _sub(file_el, "タイトル", doc.title)
+            _sub(file_el, "タイトル", _document_title(doc))
             _sub(file_el, "ファイルサイズ", str(packaged_size.get(doc.id, 0)))
             _sub(file_el, "PDF_A準拠", "1" if doc.is_pdfa else "0")
+            _sub(file_el, "版", doc.revision or "")
+            iso = _iso19650_metadata(doc)
+            if iso:
+                iso_el = ET.SubElement(file_el, "ISO19650情報")
+                for tag, value in iso.items():
+                    _sub(iso_el, tag, value)
 
     declaration = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml_body = ET.tostring(root, encoding="unicode")
     return (declaration + xml_body).encode("utf-8")
+
+
+def _document_title(doc: Document) -> str:
+    """Title as it appears in INDEX.XML, carrying the revision label.
+
+    The 版 element is authoritative; repeating the label in the title keeps the
+    revision visible in viewers that only show INDEX.XML titles.
+    """
+    if doc.revision:
+        return f"{doc.title}（{doc.revision}）"
+    return doc.title
+
+
+def _iso19650_metadata(doc: Document) -> dict[str, str]:
+    """ISO 19650 naming fields present on the document, in a stable order.
+
+    Only non-empty fields are emitted, so a package whose documents carry no ISO
+    19650 metadata stays byte-identical to the previous format.
+    """
+    fields = (
+        ("作成者コード", doc.iso19650_originator),
+        ("機能分類", doc.iso19650_functional_breakdown),
+        ("情報形式", doc.iso19650_form),
+        ("分野コード", doc.iso19650_discipline),
+        ("連番", doc.iso19650_number),
+    )
+    return {tag: str(value) for tag, value in fields if value}
 
 
 def _group_by_folder(documents: list[Document]) -> dict[str, list[Document]]:
@@ -197,7 +230,11 @@ def check_delivery_readiness(
     }
 
 
-def generate_delivery_zip(project: Project, documents: list[Document]) -> bytes:
+def generate_delivery_zip(
+    project: Project,
+    documents: list[Document],
+    generated_at: datetime | None = None,
+) -> bytes:
     """Build in-memory ZIP conforming to MLIT electronic delivery layout.
 
     Layout:
@@ -206,42 +243,57 @@ def generate_delivery_zip(project: Project, documents: list[Document]) -> bytes:
         ├── DRAWINGS/DRAW_0001.PDF …
         ├── PHOTO/PHOT_0001.PDF …
         └── …
+
+    ``generated_at`` pins the package date (root folder name and the INDEX.XML
+    作成日) so a delivery can be regenerated and verified later. ZIP entry
+    timestamps are pinned to that same instant instead of ``time.localtime``,
+    which otherwise made the bytes depend on the calling host's clock and
+    timezone. With both pinned, the same input produces byte-identical output.
     """
-    generated_at = datetime.now(timezone.utc)
+    generated_at = generated_at or datetime.now(timezone.utc)
+    if generated_at.tzinfo is None:
+        # A naive datetime would be interpreted in the host timezone; treat it
+        # as UTC so the package never depends on the calling environment.
+        generated_at = generated_at.replace(tzinfo=timezone.utc)
     date_str = generated_at.strftime("%Y%m%d")
     proj_code = _sanitize_code(project.code)
     root_dir = f"{proj_code}_{date_str}"
+    zip_date_time = generated_at.astimezone(timezone.utc).timetuple()[:6]
 
     by_folder = _group_by_folder(documents)
-    # Sizes are computed up front so INDEX.XML can stay the first ZIP entry, as
-    # it was before, while still describing the bytes actually packaged.
-    packaged_size = {
-        doc.id: _packaged_size(doc) for docs in by_folder.values() for doc in docs
-    }
+    # Read each file exactly once: the INDEX.XML size entry and the packaged
+    # bytes then come from the same read, so a file that changes between a
+    # stat() and a read() can no longer make the manifest disagree with the
+    # payload.
+    payload: dict[str, bytes] = {}
+    packaged_size: dict[str, int] = {}
+    for docs in by_folder.values():
+        for doc in docs:
+            data = _read_file(doc)
+            payload[doc.id] = data
+            packaged_size[doc.id] = len(data)
+
+    def _write(zf: zipfile.ZipFile, name: str, data: bytes) -> None:
+        info = zipfile.ZipInfo(filename=name, date_time=zip_date_time)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        # Normalise the external attributes so the bytes do not depend on the
+        # platform that produced the package.
+        info.external_attr = 0o600 << 16
+        zf.writestr(info, data)
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         index_xml = _build_index_xml(project, by_folder, generated_at, packaged_size)
-        zf.writestr(f"{root_dir}/INDEX.XML", index_xml)
+        _write(zf, f"{root_dir}/INDEX.XML", index_xml)
 
         for folder_name, docs in sorted(by_folder.items()):
             _, prefix = _FOLDER_MAP.get(docs[0].document_type, ("OTHER", "OTHE"))
             for i, doc in enumerate(docs, start=1):
                 dest_name = f"{prefix}_{i:04d}.PDF"
                 dest_path = f"{root_dir}/{folder_name}/{dest_name}"
-                zf.writestr(dest_path, _read_file(doc))
+                _write(zf, dest_path, payload[doc.id])
 
     return buf.getvalue()
-
-
-def _packaged_size(doc: Document) -> int:
-    """Bytes that will be written for this document (0 when unreadable)."""
-    if not doc.file_path:
-        return 0
-    try:
-        return Path(doc.file_path).stat().st_size
-    except OSError:
-        return 0
 
 
 def _read_file(doc: Document) -> bytes:
