@@ -40,6 +40,7 @@ check_contains() {
 check_contains "deploy env example" "$ROOT/deploy/civilpdf.env.example" "APP_VERSION=$VERSION"
 check_contains "dev env example" "$ROOT/.env.example" "APP_VERSION=$VERSION"
 check_contains "prod env example" "$ROOT/.env.prod.example" "APP_VERSION=$VERSION"
+check_contains "staging env example" "$ROOT/.env.stg.example" "APP_VERSION=$VERSION"
 check_contains_substr() {
   local label="$1" file="$2" pattern="$3"
   if [[ -f "$file" ]] && grep -qF -- "$pattern" "$file"; then

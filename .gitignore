@@ -19,6 +19,8 @@ out/
 .env
 .env.local
 .env.production
+.env.stg
+.env.staging
 deploy/civilpdf.env
 
 # IDE
