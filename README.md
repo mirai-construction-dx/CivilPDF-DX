@@ -167,6 +167,21 @@ https://civilpdf-mvp.mirai-dx-platform.com/
 
 ---
 
+## 🔗 他システムとの連携状況
+
+他リポジトリとの接続は**契約ベース**で行い、DB を共有しない（決定: [ADR-0006](docs/architecture/ADR-0006-cross-repo-integration.md)）。
+宣言の正本は [`infra/integration/system.json`](infra/integration/system.json)、検証は `python scripts/verify-integration-manifest.py`。
+
+| 相手 | 用途 | 現状 |
+| --- | --- | --- |
+| Civil-Docs-Platform | IF-09: 確定 PDF の PDF/A 化・電子納品を依頼される | 契約案あり・**未実装**（[契約案](docs/api/cdp-if-09-contract.md)） |
+| Mirai-Construction-Agent-Harness | MCP 経由のツール提供 | **未実装**（Core allowlist 登録が前提） |
+| Mirai-Harness-Core | 共通契約（`contracts`）の消費 | **未 pin** |
+| Mirai-Platform-Infra | `system_id = civilpdf` の台帳登録 | **登録待ち**（[手順](docs/operations/inter-repo-registration.md)） |
+| Mirai-Architecture-Decisions | staging 家族パターン `MCDX-ADR-0010` | 準拠済み（[ADR-0005](docs/architecture/ADR-0005-staging-environment.md)） |
+
+> 「未実装」を「実装済み」と書かないことを ADR-0006 D-5 で定めている。
+
 ## 📚 詳細資料（関係部門向け）
 
 | 資料                        | 対象                         | リンク                                                                                                       |
@@ -182,6 +197,9 @@ https://civilpdf-mvp.mirai-dx-platform.com/
 | 📋 **WebUI 画面一覧**       | PM・現場担当                 | [docs/webui-screens.md](docs/webui-screens.md)                                                               |
 | 🧪 **MVP プレビュー環境**   | 評価者・関係者               | [docs/deployment/mvp-preview-environment.md](docs/deployment/mvp-preview-environment.md)                     |
 | 🧪 **staging 環境**         | 運用・開発                   | [docs/deployment/staging-environment.md](docs/deployment/staging-environment.md)                             |
+| 🔗 **リポジトリ間連携**     | アーキテクト・PM             | [ADR-0006](docs/architecture/ADR-0006-cross-repo-integration.md)                                             |
+| 🔁 **他システム登録手順**   | 運用・アーキテクト           | [docs/operations/inter-repo-registration.md](docs/operations/inter-repo-registration.md)                     |
+| 📨 **CDP IF-09 契約案**     | 連携先（Civil-Docs-Platform） | [docs/api/cdp-if-09-contract.md](docs/api/cdp-if-09-contract.md)                                              |
 | 🪟 **Windows 11 展開手順**  | IT部門                       | [docs/windows-deployment.md](docs/windows-deployment.md)                                                     |
 | 📋 **コンプライアンス**     | 法務・監査                   | [docs/compliance.md](docs/compliance.md)                                                                     |
 

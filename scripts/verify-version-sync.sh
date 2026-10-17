@@ -80,6 +80,17 @@ if ! git -C "$ROOT" rev-parse "v$VERSION" >/dev/null 2>&1; then
   echo "WARN git tag v$VERSION does not exist yet (expected at release time)"
 fi
 
+# Cross-repo integration manifest (ADR-0006). Keeps the declared system_id,
+# interfaces and data ownership in sync with VERSION and the staging identifiers.
+if [[ -f "$ROOT/scripts/verify-integration-manifest.py" ]]; then
+  if python3 "$ROOT/scripts/verify-integration-manifest.py" --root "$ROOT"; then
+    echo "OK   integration manifest"
+  else
+    echo "FAIL integration manifest (scripts/verify-integration-manifest.py)" >&2
+    FAIL=1
+  fi
+fi
+
 if [[ $FAIL -ne 0 ]]; then
   echo "VERSION SYNC: FAILED" >&2
   exit 1
