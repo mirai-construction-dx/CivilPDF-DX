@@ -9,7 +9,9 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now civilpdf-stg.service
 #
 # 前提: 本番チェックアウトに docker-compose.staging.yml があり、
-#       .env.stg -> ~/.config/civilpdf/stg.env (0600) が用意されていること。
+#       ~/.config/civilpdf/stg.env (0600) が用意されていること。
+#       unit はその絶対パスを STG_ENV_FILE / COMPOSE_ENV_FILES で直接指す
+#       （リポジトリ内に秘密ファイルやシンボリックリンクを置かなくてよい）。
 #
 # 外部公開は Cloudflare Tunnel `civilpdf-stg` + Access のみ（未作成＝人間ゲート）。
 # 参照: docs/deployment/staging-environment.md
@@ -27,8 +29,10 @@ RemainAfterExit=yes
 User=kensan
 WorkingDirectory=/home/kensan/Projects/Mirai-Construction-DX/CivilPDF-DX
 # Compose の変数展開 (${POSTGRES_PASSWORD:?} 等) は project の .env ではなく
-# .env.stg を使う。prod checkout の .env (本番秘密) を誤って読まないための明示。
-Environment=COMPOSE_ENV_FILES=.env.stg
+# staging の正本を使う。prod checkout の .env (本番秘密) を誤って読まないための明示。
+# リポジトリ内の .env.stg シンボリックリンクに依存しない。
+Environment=COMPOSE_ENV_FILES=/home/kensan/.config/civilpdf/stg.env
+Environment=STG_ENV_FILE=/home/kensan/.config/civilpdf/stg.env
 ExecStart=/usr/bin/docker compose -f docker-compose.staging.yml up -d
 ExecStop=/usr/bin/docker compose -f docker-compose.staging.yml down
 TimeoutStartSec=300
