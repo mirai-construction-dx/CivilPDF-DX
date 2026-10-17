@@ -54,6 +54,10 @@ TIMESTAMP_HMAC_KEY=compose-guard-throwaway
 FRONTEND_PORT=18971
 EOF
 
+# The staging backend reads env secrets from ${STG_ENV_FILE:-.env.stg}. Point it at
+# the throwaway file so the guard never reads the real staging/prod secrets.
+export STG_ENV_FILE="$WORK/.env.stg"
+
 # `--no-interpolate` (compose >= 2.17) validates structure without env expansion.
 NO_INTERPOLATE=()
 if docker compose config --help 2>/dev/null | grep -q -- '--no-interpolate'; then
