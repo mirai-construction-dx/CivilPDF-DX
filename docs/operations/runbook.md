@@ -178,6 +178,27 @@ docker compose -f docker-compose.prod.yml exec -T backend python -c "import urll
 - **ロールバック**: `APPS_RELEASE_BASE_URL` を前の版のタグに戻す（または空にして「近日公開予定」表示にする）
 - **注意**: monitor の systemd unit は、この作業ツリー（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）のスクリプトを直接実行している（2026-09-26 確認）。作業が終わったら main を checkout した状態に戻すこと（§8 の共有 checkout の制約を参照）
 
+## 4.4 staging 監視
+
+staging は本番前の検証面であり、本番監視とは**状態ディレクトリと通知プレフィックスを分ける**
+（staging の障害を本番障害と誤認しない、またその逆もしない）。
+
+- **5 分毎**: `deploy/civilpdf-stg-monitor.timer` → `scripts/monitor-staging.sh`
+  - `scripts/healthcheck-staging.sh --quiet` が次を確認する:
+    `civilpdf-stg` の db / backend / frontend が running（healthcheck 定義時は healthy）、
+    `/health` が `environment=staging` を返す、frontend が 200、backend readiness（`SELECT 1`）が 200。
+  - 失敗時は `scripts/alert-notify.sh` で `[CivilPDF-DX staging]` を付けて通知する（既定 30 分スロットル）。
+    復旧時に 1 回だけ復旧通知を送る。状態は `~/.local/state/civildx-stg-monitor/`
+    （`down_since` / `last_alert_ts` / `monitor.log`）。
+  - `CIVILPDF_STG_URL` が本番ポート 18970 を指す場合は「staging ではない」として fail closed で失敗する。
+- **手動確認**: `./scripts/healthcheck-staging.sh`（`--quiet` で成功時無出力）
+- **導入**:
+  ```bash
+  sudo install -m 644 deploy/civilpdf-stg-monitor.service deploy/civilpdf-stg-monitor.timer /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl enable --now civilpdf-stg-monitor.timer
+  systemctl list-timers civilpdf-stg-monitor.timer
+  ```
+
 ## 5. ロールバック
 
 1. アプリロールバック: 直前リリースの commit を checkout → frontend 再ビルド → backend/frontend 再起動
