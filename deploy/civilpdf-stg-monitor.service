@@ -1,0 +1,18 @@
+[Unit]
+Description=CivilPDF-DX staging monitor (healthcheck + email alert)
+Documentation=https://github.com/mirai-construction-dx/CivilPDF-DX/blob/main/docs/operations/runbook.md
+
+[Service]
+Type=oneshot
+# 本番 monitor は user unit (%h) だが、staging は app unit (civilpdf-stg.service) と
+# 同じ system unit として /etc/systemd/system に置く。system unit の %h は root の
+# home を指すため、パスは絶対パスで固定し User= を明示する。
+User=kensan
+WorkingDirectory=/home/kensan/Projects/Mirai-Construction-DX/CivilPDF-DX
+ExecStart=/home/kensan/Projects/Mirai-Construction-DX/CivilPDF-DX/scripts/monitor-staging.sh
+TimeoutStartSec=5min
+
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
