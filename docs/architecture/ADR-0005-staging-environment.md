@@ -1,7 +1,7 @@
 ---
 id: ADR-0005
 title: CivilPDF-DX の staging 環境（identifiers SSOT・loopback・Access・DB 分離）
-status: proposed
+status: accepted
 category: hosting-infra
 date: 2026-10-16
 deciders: ["@Kensan196948G"]
@@ -17,7 +17,7 @@ review_by: 2027-04-16
 
 ## ステータス
 
-**proposed（提案・2026-10-16）。** 対象リポジトリ: CivilPDF-DX。
+**accepted（ローカル staging 実装・検証: 2026-10-17）。** 対象リポジトリ: CivilPDF-DX。外部公開の承認を意味しない。
 `Conforms-to: MCDX-ADR-0010`（全社 staging 家族パターン）。
 関連: `MCDX-ADR-0002`（本番の実行基盤）、`MCDX-ADR-0003`（本番 DB と入口）、`MCDX-ADR-0004`（マージとリリース）、
 `docs/deployment/mvp-preview-environment.md`（MVP プレビュー環境）、`docs/operations/runbook.md`（本番運用の正本）。
@@ -163,7 +163,7 @@ MVP を staging の代わりにしない（SQLite・AUTH_BYPASS では本番の 
 
 ## 未決定（本 ADR が決めないこと・人間ゲート）
 
-以下はすべて **UNRESOLVED** であり、AI は作成・適用しない。作成されるまで stg を公開しない（fail closed）。
+未解決の U-1/U-2 は引き続き人間ゲートとし、解消するまで stg を公開しない（fail closed）。U-3/U-5 の完了状況は以下に記録する。U-4 の保持期間は未決定であり、自動削除を有効化しない。
 
 | #   | 未決定事項                                                                                        | 決める担当   | 根拠                   |
 | --- | ------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
