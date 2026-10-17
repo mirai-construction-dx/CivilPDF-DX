@@ -68,8 +68,17 @@ for svc in db backend frontend; do
     fail "$svc state=$state"
     continue
   fi
-  if [[ "$health" != "none" && "$health" != "healthy" ]]; then
+  if [[ "$health" == "unhealthy" ]]; then
     fail "$svc health=$health"
+    continue
+  fi
+  # "starting" is the normal state during Docker's start_period / before the
+  # first successful healthcheck (e.g. right after deploy-staging.sh recreates
+  # the container). Treating it as DOWN makes the 5-minute monitor raise a false
+  # alert when its tick lands within that window. Docker itself moves a
+  # genuinely broken container to "unhealthy" after `retries`, which we fail on.
+  if [[ "$health" == "starting" ]]; then
+    ok "$svc running (health=starting)"
     continue
   fi
   ok "$svc running (health=$health)"
