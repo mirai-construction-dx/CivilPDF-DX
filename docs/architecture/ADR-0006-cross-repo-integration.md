@@ -76,10 +76,16 @@ Mirai-Platform-Infra の `systems.yaml` には **2026-10-17 に `civilpdf` と�
 
 | ID | 方向 | プロトコル | 状態 | 契約 |
 | --- | --- | --- | --- | --- |
+| `civilpdf.integration-discovery` | 受信（任意 → CivilPDF） | HTTP | **`implemented`** | [Integration API](../api/integration-api.md) |
 | `civilpdf.pdf-postprocess` | 受信（CDP → CivilPDF） | HTTP | `planned` | [CDP IF-09 契約案](../api/cdp-if-09-contract.md) |
 | `civilpdf.mcp` | 受信（MCAH → CivilPDF） | MCP | `not-implemented` | — |
 | `core.contracts` | 消費（Core → CivilPDF） | vendored-contracts | `not-integrated` | Core `docs/consumer-guide.md` |
 | `cdp.cde-registration` | 送信（CivilPDF → CDP） | HTTP | `not-implemented` | CDP 側に受入 API なし |
+
+`civilpdf.integration-discovery` は `GET /api/v1/integration/catalog`（公開）と
+`GET /api/v1/integration/ping`（HMAC 署名必須）で構成する。実装は
+`src/console/backend/api/integration.py` / `services/service_auth.py`。
+`catalog` は本 ADR のマニフェストと一致することをテストで固定している。
 
 ## 4. 人間ゲート（この ADR では自動化しない）
 

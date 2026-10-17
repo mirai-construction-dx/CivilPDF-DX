@@ -29,6 +29,16 @@
   ],
   "provides": [
     {
+      "id": "civilpdf.integration-discovery",
+      "protocol": "http",
+      "direction": "inbound",
+      "endpoint": "GET /api/v1/integration/catalog",
+      "status": "implemented",
+      "consumer": "any-system",
+      "contract": "docs/api/integration-api.md",
+      "note": "公開カタログと HMAC 署名付き /ping。相手システムが署名実装を検証できる。"
+    },
+    {
       "id": "civilpdf.pdf-postprocess",
       "protocol": "http",
       "direction": "inbound",

@@ -1,5 +1,7 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
+import re
 from typing import List
 import json
 import os
@@ -13,7 +15,9 @@ class Settings(BaseSettings):
     # extra="ignore": .env is shared with docker-compose (POSTGRES_DB,
     # FRONTEND_PORT, UVICORN_WORKERS, etc.) and Settings should not fail to
     # load just because compose-only keys are present alongside app keys.
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     app_name: str = "CivilPDF-DX"
     app_version: str = "0.10.0"
@@ -49,6 +53,29 @@ class Settings(BaseSettings):
     trust_proxy_headers: bool = False
 
     timestamp_hmac_key: str = "change-me-in-production"
+
+    # Service-to-service HMAC authentication for /api/v1/integration/* (ADR-0006 D-2).
+    # JSON object mapping system_id -> shared secret, e.g.
+    #   INTEGRATION_HMAC_SECRETS='{"civil-docs-platform":"<hex>"}'
+    # Leave UNSET (do not set it to an empty string) to keep the integration API
+    # disabled: it then answers 503 (fail closed) instead of accepting unsigned calls.
+    integration_hmac_secrets: dict[str, str] = Field(default_factory=dict)
+    integration_clock_skew_seconds: int = Field(default=300, ge=1, le=300)
+    # Dedicated shared Redis required for signed calls; no in-memory fallback.
+    integration_nonce_redis_url: str = ""
+
+    @field_validator("integration_hmac_secrets")
+    @classmethod
+    def validate_integration_secrets(cls, values: dict[str, str]) -> dict[str, str]:
+        if any(
+            not re.fullmatch(r"[a-z][a-z0-9-]{1,39}", peer)
+            or not re.fullmatch(r"[0-9a-f]{64}", secret)
+            for peer, secret in values.items()
+        ):
+            raise ValueError("integration peers require valid IDs and 64-hex secrets")
+        if len(values) > 32 or len(set(values.values())) != len(values):
+            raise ValueError("integration secrets must be unique; at most 32 peers")
+        return values
 
     # Entra ID / OpenID Connect SSO (Phase 1)
     oidc_client_id: str = ""
