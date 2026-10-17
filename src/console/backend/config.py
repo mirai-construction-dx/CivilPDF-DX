@@ -50,6 +50,14 @@ class Settings(BaseSettings):
 
     timestamp_hmac_key: str = "change-me-in-production"
 
+    # Service-to-service HMAC authentication for /api/v1/integration/* (ADR-0006 D-2).
+    # JSON object mapping system_id -> shared secret, e.g.
+    #   INTEGRATION_HMAC_SECRETS='{"civil-docs-platform":"<hex>"}'
+    # Leave UNSET (do not set it to an empty string) to keep the integration API
+    # disabled: it then answers 503 (fail closed) instead of accepting unsigned calls.
+    integration_hmac_secrets: dict[str, str] = {}
+    integration_clock_skew_seconds: int = 300
+
     # Entra ID / OpenID Connect SSO (Phase 1)
     oidc_client_id: str = ""
     oidc_client_secret: str = ""
