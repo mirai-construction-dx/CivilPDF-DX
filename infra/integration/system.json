@@ -75,7 +75,7 @@
     "cde-records": "Civil-Docs-Platform"
   },
   "registration": {
-    "platformInfra": "pending",
+    "platformInfra": "registered",
     "harnessCore": "pending",
     "civilDocsPlatform": "pending"
   },
