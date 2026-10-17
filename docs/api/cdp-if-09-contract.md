@@ -21,8 +21,8 @@ CDP で確定した PDF を CivilPDF-DX に渡し、次の後処理を非同期�
 
 - 人間ユーザーの JWT は使わない。**サービス間 HMAC** を使う。
 - 署名・ヘッダ・正規化文字列の正本は [Integration API](integration-api.md) §2 とする
-  （実装済みの `/api/v1/integration/ping` と同じ方式。timestamp は Unix epoch 秒または RFC3339、
-  許容 skew ±300 秒、nonce 再利用は **401**、共有秘密は `INTEGRATION_HMAC_SECRETS`）。
+  （`/api/v1/integration/ping` と同じ HMAC v1。system_id も署名対象、timestamp は Unix epoch 秒のみ、
+  許容 skew ±300 秒、nonce 再利用は **401**。共有秘密と共有 Redis の両方が必須）。
 - 共有秘密は各環境の `~/.config/<repo>/<env>.env`（0600）に置き、リポジトリへ置かない。
 
 ## 3. エンドポイント（予定）

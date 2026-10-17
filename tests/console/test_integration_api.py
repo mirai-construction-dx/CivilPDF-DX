@@ -25,14 +25,23 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "infra" / "integration" / "system.json"
 
 SYSTEM = "civil-docs-platform"
-SECRET = "test-integration-secret"
+SECRET = "a" * 64
 
 
 @pytest.fixture(autouse=True)
-def _reset_nonces():
-    service_auth.reset_nonce_cache()
-    yield
-    service_auth.reset_nonce_cache()
+def _reset_nonces(monkeypatch):
+    # Shared-store double. Real Lua/multi-process behavior is integration-tested
+    # separately; API tests must never connect to a deployed Redis instance.
+    seen = {}
+
+    async def consume(system, nonce, now, expires, window):
+        key = (system, nonce)
+        if key in seen and seen[key] > now:
+            return 0
+        seen[key] = expires
+        return 1
+
+    monkeypatch.setattr(service_auth, "_consume_nonce", consume)
 
 
 def _sign(
@@ -44,7 +53,7 @@ def _sign(
     secret: str = SECRET,
 ) -> str:
     message = (
-        f"{method}\n{path}\n{timestamp}\n{nonce}\n"
+        f"{SYSTEM}\n{method}\n{path}\n{timestamp}\n{nonce}\n"
         f"{hashlib.sha256(body).hexdigest()}"
     ).encode()
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
@@ -72,6 +81,7 @@ def _headers(
 @pytest.fixture
 def configured(monkeypatch):
     monkeypatch.setattr(settings, "integration_hmac_secrets", {SYSTEM: SECRET})
+    monkeypatch.setattr(settings, "integration_nonce_redis_url", "redis://test-only")
     return settings
 
 
@@ -97,11 +107,11 @@ class TestCatalog:
         assert body["registration"] == manifest["registration"]
         for section in ("provides", "consumes"):
             advertised = {
-                (item["id"], item["protocol"], item["status"])
+                (item["id"], item["protocol"], item["status"], item.get("endpoint"))
                 for item in body["interfaces"][section]
             }
             declared = {
-                (item["id"], item["protocol"], item["status"])
+                (item["id"], item["protocol"], item["status"], item.get("endpoint"))
                 for item in manifest[section]
             }
             assert advertised == declared, section

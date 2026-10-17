@@ -52,6 +52,7 @@ CATALOG: dict = {
                 "id": "civilpdf.mcp",
                 "protocol": "mcp",
                 "status": "not-implemented",
+                "endpoint": "mcp://civilpdf",
             },
         ],
         "consumes": [

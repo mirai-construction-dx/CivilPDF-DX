@@ -1,66 +1,46 @@
-# CivilPDF-DX Integration API（カタログとサービス間認証）
+# Integration API — HMAC v1 discovery and signed ping
 
-- 状態: **実装済み**（`civilpdf.integration-discovery`）。ジョブ API は [CDP IF-09 契約案](cdp-if-09-contract.md) のまま **planned**。
-- 決定: [ADR-0006](../architecture/ADR-0006-cross-repo-integration.md) D-2
-- マニフェスト: `infra/integration/system.json`
-- 実装: `src/console/backend/api/integration.py` / `src/console/backend/services/service_auth.py`
+Status: implemented in this branch, not a claim of deployed inter-system connectivity.
+IF-09 job execution is still **planned**. See [IF-09](cdp-if-09-contract.md)
+and [ADR-0006](../architecture/ADR-0006-cross-repo-integration.md).
 
-## 1. 提供エンドポイント
+## Endpoints
 
-| メソッド | パス | 認証 | 用途 |
-| --- | --- | --- | --- |
-| GET | `/api/v1/integration/catalog` | なし（公開・秘密を含まない） | システム識別・実装済み IF・登録状態の discover |
-| GET | `/api/v1/integration/ping` | HMAC | 署名実装の疎通確認 |
+| Endpoint | Authentication | Behavior |
+| --- | --- | --- |
+| `GET /api/v1/integration/catalog` | Public, read-only metadata | System/version, interface statuses and registry state; no business data or secrets |
+| `GET /api/v1/integration/ping` | HMAC v1 | Signed connectivity probe; no data access or job execution |
 
-### catalog の例
+`catalog` remains public even when signing is disabled. The manifest parity test
+checks its declared interfaces. `ping` fails closed with **503** unless both peer
+secrets and a shared nonce Redis URL are configured.
 
-```json
-{
-  "systemId": "civilpdf",
-  "displayName": "CivilPDF-DX",
-  "repository": "mirai-construction-dx/CivilPDF-DX",
-  "version": "0.10.0",
-  "environment": "staging",
-  "interfaces": {
-    "provides": [
-      {"id": "civilpdf.integration-discovery", "protocol": "http", "status": "implemented"},
-      {"id": "civilpdf.pdf-postprocess", "protocol": "http", "status": "planned"},
-      {"id": "civilpdf.mcp", "protocol": "mcp", "status": "not-implemented"}
-    ],
-    "consumes": [
-      {"id": "core.contracts", "protocol": "vendored-contracts", "status": "not-integrated"},
-      {"id": "cdp.cde-registration", "protocol": "http", "status": "not-implemented"}
-    ]
-  },
-  "registration": {"platformInfra": "registered", "harnessCore": "pending", "civilDocsPlatform": "pending"},
-  "authentication": {
-    "scheme": "hmac-sha256",
-    "headers": ["X-CivilPDF-System", "X-CivilPDF-Timestamp", "X-CivilPDF-Nonce", "X-CivilPDF-Signature"],
-    "clockSkewSeconds": 300,
-    "contract": "docs/api/integration-api.md"
-  }
-}
-```
+## Configuration
 
-> `catalog` は `infra/integration/system.json` と一致することを
-> `tests/console/test_integration_api.py` が検証する。片方だけ更新すると CI が落ちる。
+- `INTEGRATION_HMAC_SECRETS`: JSON map of system IDs to **distinct 64-character
+  lowercase hex secrets**, generated using `openssl rand -hex 32`. At most 32 peers.
+  Keep values outside Git in the environment-specific 0600 secret file.
+- `INTEGRATION_NONCE_REDIS_URL`: dedicated shared Redis for all API workers.
+  No local-cache fallback. Connection and command timeouts are 2 seconds.
+- `INTEGRATION_CLOCK_SKEW_SECONDS`: 1–300 seconds, default 300.
 
-## 2. 署名（HMAC-SHA256）
+Do not set secret JSON to an empty string. Absent secrets leave signed calls
+unavailable; they do not grant anonymous access. This change does not create
+Redis, configure secrets, or enable external publication automatically.
 
-### 2.1 ヘッダ
+## HMAC v1 wire contract
 
-| ヘッダ | 値 |
-| --- | --- |
-| `X-CivilPDF-System` | 呼び出し元の `system_id`（例 `civil-docs-platform`） |
-| `X-CivilPDF-Timestamp` | Unix epoch 秒（RFC 3339 も受理） |
-| `X-CivilPDF-Nonce` | 128bit 以上のランダム hex。時計ずれ許容時間内で再利用不可 |
-| `X-CivilPDF-Signature` | 下記の hex 署名（小文字） |
+Headers:
 
-### 2.2 正規化文字列
+- `X-CivilPDF-System`: lowercase system ID, matching `[a-z][a-z0-9-]{1,39}`.
+- `X-CivilPDF-Timestamp`: Unix epoch seconds, 1–12 decimal digits (not RFC3339).
+- `X-CivilPDF-Nonce`: exactly 32 lowercase hex characters, randomly generated.
+- `X-CivilPDF-Signature`: exactly 64 lowercase hex characters.
 
-UTF-8・LF 区切り・末尾改行なし:
+UTF-8 signing input, LF-separated with **no trailing LF**:
 
-```
+```text
+SYSTEM
 METHOD
 PATH
 TIMESTAMP
@@ -68,54 +48,62 @@ NONCE
 SHA256_HEX(BODY)
 ```
 
-- `PATH` は `request.url.path`（クエリ文字列は含めない。パラメータは本文へ）
-- `BODY` は生のリクエスト本文（GET は空）
-- 署名 = `hex(HMAC-SHA256(secret, 正規化文字列))`
+`SYSTEM` is included so a changed identity header invalidates the signature.
+`METHOD` is uppercase; `PATH` is the request URL path. Query strings are rejected
+with 400, not silently excluded from the authenticated content. GET accepts no
+body (413 if present). Reserved non-GET usage is limited to 4096 bytes before
+buffering; no job endpoint is exposed in this change.
 
-### 2.3 検証仕様
-
-- 共有秘密は `INTEGRATION_HMAC_SECRETS`（JSON: `{"<system_id>":"<hex>"}`）で設定する。
-  **未設定なら統合 API 全体が 503（fail closed）**。空文字を設定しないこと。
-- 時計ずれは `INTEGRATION_CLOCK_SKEW_SECONDS`（既定 300 秒）を超えると 401。
-- nonce の再利用は 401。
-- 未知の `system_id`、署名不一致、ヘッダ欠落はすべて 401。
-
-### 2.4 参照実装（Python）
+Reference signer (stdlib):
 
 ```python
-import hashlib, hmac, time, uuid
+import hashlib
+import hmac
+import time
+import uuid
 
-def sign(secret: str, method: str, path: str, body: bytes = b"") -> dict[str, str]:
-    ts = str(int(time.time()))
+
+def sign(secret, system, method, path, body=b""):
+    timestamp = str(int(time.time()))
     nonce = uuid.uuid4().hex
-    canonical = f"{method}\n{path}\n{ts}\n{nonce}\n{hashlib.sha256(body).hexdigest()}"
+    canonical = (
+        f"{system}\n{method.upper()}\n{path}\n{timestamp}\n{nonce}\n"
+        f"{hashlib.sha256(body).hexdigest()}"
+    )
     signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
     return {
-        "X-CivilPDF-System": "civil-docs-platform",
-        "X-CivilPDF-Timestamp": ts,
+        "X-CivilPDF-System": system,
+        "X-CivilPDF-Timestamp": timestamp,
         "X-CivilPDF-Nonce": nonce,
         "X-CivilPDF-Signature": signature,
     }
 ```
 
-疎通確認:
+## Replay protection and bounds
 
-```bash
-curl -s http://127.0.0.1:18971/api/v1/integration/catalog | python3 -m json.tool
-# 署名付き /ping は上記 sign() のヘッダを付けて呼ぶ
-```
+All workers atomically consume `(system, nonce)` in Redis via a Lua script. The
+member is retained until **signed timestamp + skew + 1 second**, not arrival time
++ skew; this prevents future-dated requests from becoming replayable early.
+Expired members are pruned atomically. Each peer has at most **1000 live nonces**;
+additional requests fail with 429. The key expires after at most twice the skew
+plus two seconds. Peer IDs are hashed in key names.
 
-## 3. 既知の制限
+- Missing/malformed headers, bad signatures, stale timestamps and replay: **401**.
+- Missing configuration or unavailable nonce Redis: **503** (never local fallback).
+- Nonce quota: **429**.
+- Middleware burst limits: ping 60/IP/minute, catalog 120/IP/minute **per worker**.
+  These are not cluster-global rate limits; the nonce quota is shared.
 
-- nonce の再生防止キャッシュは**プロセス内**である。uvicorn を複数 worker で動かすと、
-  別 worker に届いた再生リクエストは通る可能性がある。将来のジョブ API では
-  `Idempotency-Key` と DB の nonce 表で副作用を二重実行しない設計にする。
-- レート制限はアプリ共通のミドルウェアに従う（サービス間呼び出し専用の別枠は未設定）。
+Redis durability/eviction is an operational prerequisite: use a dedicated
+no-eviction instance and preserve nonce records over restarts within the signing
+window. This implementation does not guarantee replay resistance after loss of
+Redis state. Leave signed calls disabled until that deployment requirement is
+met. Job side effects also require persistent idempotency before IF-09 is enabled.
 
-## 4. 受入テスト
+## Tests
 
-`tests/console/test_integration_api.py`:
-
-- catalog がマニフェストと一致する
-- 未設定時 503 / ヘッダ欠落・未知システム・改ざん・期限切れ・nonce 再利用・パス束縛が 401
-- 正しい署名で 200（`caller` が返る）
+API and adversarial tests cover public-catalog parity, exact-route service-auth
+inventory, valid signing, identity/path binding, malformed/oversized headers,
+query/body rejection, stale timestamps, future timestamp retention, replay,
+Redis outage, missing configuration, quota and secret validation. An isolated
+Redis subprocess test validates Lua atomicity, cross-process replay and TTL.

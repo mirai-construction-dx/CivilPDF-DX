@@ -24,6 +24,8 @@ from config import settings
 
 # Path -> (max_requests, window_seconds). More specific prefixes win.
 _RULES: dict[str, tuple[int, int]] = {
+    "/api/v1/integration/ping": (60, 60),
+    "/api/v1/integration/catalog": (120, 60),
     "/api/v1/auth/token": (10, 60),
     "/api/v1/auth/m365/login": (10, 60),
     "/api/v1/auth/password-reset/request": (5, 60),
