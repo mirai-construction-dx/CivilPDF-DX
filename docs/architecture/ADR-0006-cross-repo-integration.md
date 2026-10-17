@@ -61,6 +61,17 @@ MCP 公開・イベント連携より前に `core.lock.json` + `contracts/` を�
 `planned` は「契約は決めたがコードが無い」、`not-implemented` は「契約も未確定」を意味する。
 `scripts/verify-integration-manifest.py` が語彙と参照ファイルの実在を検査する。
 
+### D-6. Core のシステム台帳には「前提が揃うまで」登録しない
+
+Mirai-Platform-Infra の `systems.yaml` には **2026-10-17 に `civilpdf` として登録**した
+（PR: Mirai-Platform-Infra #62。`uses_core: false` / `production: false`）。
+
+一方、Mirai-Harness-Core の `registries/systems.yaml` は `audience` と `db_schema` を
+必須とする。CivilPDF-DX は Core 共有 DB を利用せず（D-3）、MCP audience も未公開である。
+空文字や架空の `db_schema` で埋めると「共有 DB を使っている」「MCP を公開済み」と
+読めてしまうため、**Core pin と MCP サーバ公開が済むまで Core 台帳へは登録しない**。
+手順は [inter-repo-registration.md](../operations/inter-repo-registration.md) §3 に置く。
+
 ## 3. インターフェース一覧（現時点）
 
 | ID | 方向 | プロトコル | 状態 | 契約 |

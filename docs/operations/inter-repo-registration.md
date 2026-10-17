@@ -30,10 +30,19 @@ CivilPDF-DX は `system_id = civilpdf` を宣言しているが、中央台帳�
 
 ## 3. Mirai-Harness-Core への登録
 
-1. `Mirai-Harness-Core/registries/systems.yaml` に `civilpdf` を追加する PR を作る。
-2. 先に `core.lock.json` + `contracts/` の pin 方法を決める
+> **2026-10-17 時点の決定: 登録しない（保留）。** Core の
+> `schemas/registry/systems.schema.json` は `audience` と `db_schema` を**必須**とする。
+> CivilPDF-DX は Core 共有 DB を利用せず（ADR-0006 D-3）、MCP audience も未公開である。
+> 空文字や架空の `db_schema` で埋めると「Core の共有 DB を使っている」「MCP を公開済み」と
+> 読めてしまうため、**前提が揃うまで登録しない**（ADR-0006 D-6）。
+
+1. 前提: `core.lock.json` + `contracts/` の pin 方法を決める
    （`Mirai-Harness-Core/docs/consumer-guide.md` の `mhc pull` / `mhc verify`）。
-3. マージ後、本リポジトリの `registration.harnessCore` を `registered` に、
+2. 前提: `audience` の値を決める（MCP サーバの audience。例 `api://civilpdf`）。
+   `db_schema` は Core 共有 DB を使わないため、Core 側と協議して
+   「共有 DB を持たない consumer」を表現できるまで登録を見送る。
+3. `registers/systems.yaml` に追加する PR を出し、`tools/check_consistency.py` を通す。
+4. マージ後、本リポジトリの `registration.harnessCore` を `registered` に、
    `consumes[core.contracts].status` を `implemented` に変更する。
 
 ## 4. Civil-Docs-Platform との IF-09 合意
