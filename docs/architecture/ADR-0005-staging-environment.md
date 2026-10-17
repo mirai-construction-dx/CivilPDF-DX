@@ -22,7 +22,8 @@ review_by: 2027-04-16
 関連: `MCDX-ADR-0002`（本番の実行基盤）、`MCDX-ADR-0003`（本番 DB と入口）、`MCDX-ADR-0004`（マージとリリース）、
 `docs/deployment/mvp-preview-environment.md`（MVP プレビュー環境）、`docs/operations/runbook.md`（本番運用の正本）。
 
-本 ADR は **提案** であり、`accepted` ではない。人間ゲート（§未決定）が解消されるまで staging は公開しない（fail closed）。
+本 ADR は **accepted**（2026-10-17、CTO 全権委譲下で実装・検証済み）。ただし外部公開は
+人間ゲート（§未決定 U-1/U-2）が解消されるまで行わない（fail closed）。
 
 ## 背景
 
@@ -168,9 +169,13 @@ MVP を staging の代わりにしない（SQLite・AUTH_BYPASS では本番の 
 | --- | ------------------------------------------------------------------------------------------------- | ------------ | ---------------------- |
 | U-1 | staging 用 Cloudflare Tunnel `civilpdf-stg` の作成と DNS レコード `civilpdf-stg` の追加           | human kensan | 本番 zone への書き込み |
 | U-2 | staging 用 Access application `civilpdf-stg` とポリシーの作成（bypass/everyone を置かない）       | human kensan | 同上                   |
-| U-3 | `~/.config/civilpdf/stg.env` の実値（`SECRET_KEY`・`TIMESTAMP_HMAC_KEY`・`POSTGRES_PASSWORD` 等） | human kensan | 秘密の生成             |
+| U-3 | ~~`~/.config/civilpdf/stg.env` の実値~~ **RESOLVED 2026-10-17**（0600 で作成し、DB ロールと整合） | —            | 秘密の生成             |
 | U-4 | `civilpdf_stg` の保持期間（いつ破棄するか）                                                       | DevOps       | 運用                   |
-| U-5 | frontend の stg 画面マーカーの実装                                                                | 別 PR        | 本 ADR の範囲外        |
+| U-5 | ~~frontend の stg 画面マーカー~~ **RESOLVED 2026-10-17**（PR #167）                               | —            | 本 ADR の範囲外        |
+
+> 2026-10-17 実測: `civilpdf-stg.service` は enabled/active、`/health` は
+> `environment=staging`、スモーク 7/7 PASS、DB は `alembic upgrade head` 済み。
+> 監視は `civilpdf-stg-monitor.timer`（5 分毎）。公開だけが U-1/U-2 待ちである。
 
 ## 検証
 

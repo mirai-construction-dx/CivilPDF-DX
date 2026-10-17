@@ -207,6 +207,10 @@ docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
 | --- | ------------------------------------------------------------------------------------------------- | ------------ |
 | U-1 | Cloudflare Tunnel `civilpdf-stg` の作成と DNS レコード `civilpdf-stg` の追加                      | human kensan |
 | U-2 | Access application `civilpdf-stg` とポリシーの作成（bypass/everyone を置かない）                  | human kensan |
-| U-3 | `~/.config/civilpdf/stg.env` の実値（`SECRET_KEY`・`TIMESTAMP_HMAC_KEY`・`POSTGRES_PASSWORD` 等） | human kensan |
+| U-3 | ~~`~/.config/civilpdf/stg.env` の実値~~ **解消 2026-10-17**（0600 で作成し DB ロールと整合）      | —            |
 | U-4 | `civilpdf_stg` の保持期間                                                                         | DevOps       |
-| U-5 | frontend の stg 画面マーカー実装                                                                  | 別 PR        |
+| U-5 | ~~frontend の stg 画面マーカー実装~~ **解消 2026-10-17**（PR #167）                               | —            |
+
+> 2026-10-17 実測: `civilpdf-stg.service` は enabled/active で、再起動後も healthy。
+> `/health` は `environment=staging`、スモークは 7/7 PASS、DB は `alembic upgrade head` 済み。
+> 監視は `civilpdf-stg-monitor.timer`（5 分毎）。残る公開ゲートは U-1/U-2 のみ。

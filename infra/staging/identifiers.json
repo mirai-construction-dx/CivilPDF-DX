@@ -66,12 +66,20 @@
       "purpose": "staging 専用 Cloudflare Access application `civilpdf-stg` とポリシーを作成する。bypass / everyone を置かない。",
       "owner": "human kensan",
       "blockedBy": "ADR-0005 U-2"
-    },
-    {
-      "id": "stg-0004-secret-values",
-      "purpose": "~/.config/civilpdf/stg.env (0600) を作成し、SECRET_KEY / TIMESTAMP_HMAC_KEY / POSTGRES_PASSWORD 等の実値を投入する。値はリポジトリへ置かない。",
-      "owner": "human kensan",
-      "blockedBy": "ADR-0005 U-3"
     }
-  ]
+  ],
+  "deployment": {
+    "$comment": "2026-10-17 実測。staging はホスト上で稼働済み（loopback のみ）。公開は access.status が not-created の間は行わない (fail closed)。",
+    "status": "deployed-local",
+    "since": "2026-10-17",
+    "unit": "civilpdf-stg.service",
+    "monitor": "civilpdf-stg-monitor.timer",
+    "verification": "scripts/staging-smoke.py 7/7 PASS; alembic upgrade head",
+    "secrets": {
+      "status": "configured",
+      "path": "~/.config/civilpdf/stg.env",
+      "mode": "0600",
+      "note": "値はリポジトリに置かない。旧 stg-0004 は本対応で解消。"
+    }
+  }
 }
