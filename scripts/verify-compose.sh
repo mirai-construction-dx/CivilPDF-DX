@@ -102,7 +102,7 @@ fi
 
 if [[ "$RESOLVED_OK" -eq 1 ]]; then
   set +e
-  python3 - "$STAGING_OUT" "$PROD_OUT" <<'PY'
+  python3 - "$STAGING_OUT" "$PROD_OUT" "$ROOT" <<'PY'
 import json
 import sys
 
@@ -185,6 +185,104 @@ if len(published) == 1:
 for service in ("db", "backend"):
     ports = host_ports(prod, service)
     check(f"prod {service} publishes no host ports", len(ports) == 0, f"ports={ports}")
+
+# -- infra/staging/identifiers.json contract -----------------------------------
+# identifiers.json is the single source of truth for the staging environment.
+# Fail when the compose files or the shipped unit/script files drift from it
+# (e.g. someone renames the project, moves the port, or adds a volume).
+import os
+
+root = sys.argv[3]
+ids_path = os.path.join(root, "infra", "staging", "identifiers.json")
+ids = None
+try:
+    with open(ids_path, encoding="utf-8") as handle:
+        ids = json.load(handle)
+    check("identifiers.json is readable JSON", True)
+except OSError as exc:
+    check("identifiers.json is readable JSON", False, f"{exc}")
+except json.JSONDecodeError as exc:
+    check("identifiers.json is readable JSON", False, f"invalid JSON: {exc}")
+
+if ids is not None:
+    check(
+        "identifiers environment is staging",
+        ids.get("environment") == "staging",
+        f"got={ids.get('environment')!r}",
+    )
+    check(
+        "staging compose project matches identifiers",
+        staging.get("name") == ids.get("composeProject"),
+        f"compose={staging.get('name')!r} identifiers={ids.get('composeProject')!r}",
+    )
+    listen = ids.get("listen") or {}
+    if len(published) == 1:
+        _svc, port = published[0]
+        check(
+            "staging published port matches identifiers",
+            str(port.get("published")) == str(listen.get("port")),
+            f"compose={port.get('published')!r} identifiers={listen.get('port')!r}",
+        )
+        check(
+            "staging bind host matches identifiers",
+            port.get("host_ip") == listen.get("host"),
+            f"compose={port.get('host_ip')!r} identifiers={listen.get('host')!r}",
+        )
+
+    db_environment = staging.get("services", {}).get("db", {}).get("environment") or {}
+    check(
+        "staging database name matches identifiers",
+        db_environment.get("POSTGRES_DB") == ids.get("databaseName"),
+        f"compose={db_environment.get('POSTGRES_DB')!r} identifiers={ids.get('databaseName')!r}",
+    )
+
+    configured_volumes = staging.get("volumes") or {}
+    for key in ("postgres", "uploads"):
+        expected = (ids.get("volumes") or {}).get(key)
+        check(
+            f"staging volume {key} matches identifiers",
+            bool(expected) and expected in configured_volumes,
+            f"identifiers={expected!r} compose={sorted(configured_volumes)}",
+        )
+
+    units = ids.get("units") or {}
+    for key in ("app", "tunnel"):
+        unit = units.get(key)
+        check(
+            f"identifiers unit {key} exists",
+            bool(unit) and os.path.isfile(os.path.join(root, "deploy", unit)),
+            f"deploy/{unit}",
+        )
+    for key in ("composeFile", "repoEnvExample", "seedScript", "smokeScript"):
+        rel = ids.get(key)
+        check(
+            f"identifiers {key} exists",
+            bool(rel) and os.path.isfile(os.path.join(root, rel)),
+            f"{rel}",
+        )
+
+    production = ids.get("production") or {}
+    prod_db_environment = prod.get("services", {}).get("db", {}).get("environment") or {}
+    check(
+        "prod database name matches identifiers",
+        prod_db_environment.get("POSTGRES_DB") == production.get("databaseName"),
+        f"compose={prod_db_environment.get('POSTGRES_DB')!r} identifiers={production.get('databaseName')!r}",
+    )
+    check(
+        "staging and production databases differ",
+        bool(ids.get("databaseName")) and ids.get("databaseName") != production.get("databaseName"),
+        f"staging={ids.get('databaseName')!r} prod={production.get('databaseName')!r}",
+    )
+    check(
+        "staging and production FQDNs differ",
+        bool(ids.get("fqdn")) and ids.get("fqdn") != production.get("fqdn"),
+        f"staging={ids.get('fqdn')!r} prod={production.get('fqdn')!r}",
+    )
+    check(
+        "staging and production tunnels differ",
+        bool(ids.get("tunnelName")) and ids.get("tunnelName") != production.get("tunnelName"),
+        f"staging={ids.get('tunnelName')!r} prod={production.get('tunnelName')!r}",
+    )
 
 sys.exit(1 if failures else 0)
 PY
