@@ -70,14 +70,18 @@ def test_production_identifier_leak_is_rejected(tmp_path: Path) -> None:
     manifest = tmp_path / "system.json"
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
-    staging_ids = json.loads((ROOT / "infra/staging/identifiers.json").read_text(encoding="utf-8"))
+    staging_ids = json.loads(
+        (ROOT / "infra/staging/identifiers.json").read_text(encoding="utf-8")
+    )
     leaked = json.loads(json.dumps(staging_ids))
     leaked["tunnelName"] = leaked["production"]["tunnelName"]
     (tmp_path / "infra" / "staging").mkdir(parents=True)
     (tmp_path / "infra" / "staging" / "identifiers.json").write_text(
         json.dumps(leaked), encoding="utf-8"
     )
-    (tmp_path / "VERSION").write_text((ROOT / "VERSION").read_text(encoding="utf-8"), encoding="utf-8")
+    (tmp_path / "VERSION").write_text(
+        (ROOT / "VERSION").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     data["stagingIdentifiers"] = "infra/staging/identifiers.json"
     manifest.write_text(json.dumps(data), encoding="utf-8")
 

@@ -119,9 +119,13 @@ def validate(root: Path, manifest_path: Path) -> list[str]:
             if isinstance(evidence, str) and not (root / evidence).exists():
                 fail(f"{adr_id}: evidence {evidence!r} does not exist")
             if adr.get("scope") == "local":
-                matches = sorted((root / "docs" / "architecture").glob(f"{adr_id}-*.md"))
+                matches = sorted(
+                    (root / "docs" / "architecture").glob(f"{adr_id}-*.md")
+                )
                 if not matches:
-                    fail(f"{adr_id}: local ADR file docs/architecture/{adr_id}-*.md not found")
+                    fail(
+                        f"{adr_id}: local ADR file docs/architecture/{adr_id}-*.md not found"
+                    )
 
     # --- interfaces ---------------------------------------------------------
     seen_ids: set[str] = set()
@@ -203,7 +207,9 @@ def check_siblings(root: Path, manifest: dict, out: list[str]) -> None:
         if system_id and system_id in text:
             out.append(f"OK   {repo}/{rel} mentions {system_id}")
         else:
-            out.append(f"INFO {repo}/{rel} does not mention {system_id} yet (registration PR pending)")
+            out.append(
+                f"INFO {repo}/{rel} does not mention {system_id} yet (registration PR pending)"
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -214,7 +220,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
-    manifest_path = Path(args.manifest) if args.manifest else root / "infra" / "integration" / "system.json"
+    manifest_path = (
+        Path(args.manifest)
+        if args.manifest
+        else root / "infra" / "integration" / "system.json"
+    )
 
     errors = validate(root, manifest_path.resolve())
     if errors:
