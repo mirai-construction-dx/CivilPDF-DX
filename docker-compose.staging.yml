@@ -60,9 +60,13 @@ services:
       context: src/console/backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    # .env.stg -> ~/.config/civilpdf/stg.env (0600)。本番の .env を流用しない。
+    # 環境変数の実値。既定はリポジトリ内の .env.stg（~/.config/civilpdf/stg.env への
+    # シンボリックリンク）。STG_ENV_FILE を設定すると、リポジトリに秘密を置かずに
+    # 正本 (0600) を直接指せる:
+    #   STG_ENV_FILE=/home/kensan/.config/civilpdf/stg.env
+    # 本番の .env を流用しない。
     env_file:
-      - .env.stg
+      - ${STG_ENV_FILE:-.env.stg}
     environment:
       # DATABASE_URL は compose 側で組み立て、db サービスを必ず指す（.env.stg の値より優先）
       DATABASE_URL: postgresql://${POSTGRES_USER:-civilpdf_stg}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-civilpdf_stg}
