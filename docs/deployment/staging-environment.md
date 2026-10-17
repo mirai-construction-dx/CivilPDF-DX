@@ -54,31 +54,34 @@ MVP を staging の代わりにしない（SQLite・AUTH_BYPASS では本番の 
 
 前提: 本番チェックアウト（`~/Projects/Mirai-Construction-DX/CivilPDF-DX`）に
 `docker-compose.staging.yml` と `.env.stg.example` がある。
+staging の秘密は**リポジトリの外**（`~/.config/civilpdf/stg.env`, mode 0600）に置く。
+リポジトリ内に `.env.stg` を置く必要はない（置く場合も gitignore 済みのシンボリックリンクに限る）。
 
 ```bash
 cd ~/Projects/Mirai-Construction-DX/CivilPDF-DX
+STG_ENV="$HOME/.config/civilpdf/stg.env"
 
 # 1) 秘密の正本を作成（0600・実値を記入。本番の値を流用しない）
-install -m 600 .env.stg.example ~/.config/civilpdf/stg.env
-$EDITOR ~/.config/civilpdf/stg.env          # 生成例: openssl rand -hex 32
+install -m 600 .env.stg.example "$STG_ENV"
+$EDITOR "$STG_ENV"                          # 生成例: openssl rand -hex 32
 
-# 2) compose が読む .env.stg をシンボリックリンクで用意（.env.stg は gitignore 済み）
-ln -s ~/.config/civilpdf/stg.env .env.stg
+# 2) 起動（project civilpdf-stg・loopback 18971）
+#    STG_ENV_FILE で backend の env_file を、--env-file で Compose の変数展開を
+#    どちらもリポジトリ外の正本に向ける。本番 checkout の .env（本番秘密）を誤読しない。
+STG_ENV_FILE="$STG_ENV" docker compose --env-file "$STG_ENV" \
+  -f docker-compose.staging.yml up -d --build
 
-# 3) 起動（project civilpdf-stg・loopback 18971）
-#    注: --env-file .env.stg は必須。Compose の ${POSTGRES_PASSWORD:?} 展開は project の
-#    .env を読むため、本番 checkout の .env（本番秘密）を誤読しないよう明示する。
-docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
+# 3) 状態確認（db / backend はホストへポート公開しない。frontend のみ 127.0.0.1:18971）
+STG_ENV_FILE="$STG_ENV" docker compose --env-file "$STG_ENV" \
+  -f docker-compose.staging.yml ps
 
-# 4) 状態確認（db / backend はホストへポート公開しない。frontend のみ 127.0.0.1:18971）
-docker compose --env-file .env.stg -f docker-compose.staging.yml ps
-
-# 5) /health が environment=staging を返すことを確認
+# 4) /health が environment=staging を返すことを確認
 curl -s http://127.0.0.1:18971/health
 ```
 
 `POSTGRES_PASSWORD` が未設定だと compose が起動を拒否する（`${POSTGRES_PASSWORD:?}`）。
 db・backend は `ports:` を持たず、ホストへ公開されるのは `127.0.0.1:18971` のみ。
+`STG_ENV_FILE` を省略した場合は従来どおりリポジトリ内の `.env.stg` を読む（後方互換）。
 
 ### systemd（ホスト常駐）
 
