@@ -1,0 +1,98 @@
+{
+  "$comment": "CivilPDF-DX のリポジトリ間連携マニフェスト。識別子・IF・データ所有権の宣言であり、実装の正本ではない。ADR: docs/architecture/ADR-0006-cross-repo-integration.md / 検証: scripts/verify-integration-manifest.py",
+  "schemaVersion": 1,
+  "systemId": "civilpdf",
+  "displayName": "CivilPDF-DX",
+  "repository": "mirai-construction-dx/CivilPDF-DX",
+  "version": "0.10.0",
+  "versionSource": "VERSION",
+  "stagingIdentifiers": "infra/staging/identifiers.json",
+  "adrs": [
+    {
+      "id": "MCDX-ADR-0010",
+      "scope": "external",
+      "conformance": "conforms",
+      "evidence": "docs/architecture/ADR-0005-staging-environment.md"
+    },
+    {
+      "id": "MCDX-ADR-0004",
+      "scope": "external",
+      "conformance": "conforms",
+      "evidence": "GITHUB_POLICY.md"
+    },
+    {
+      "id": "ADR-0006",
+      "scope": "local",
+      "conformance": "conforms",
+      "evidence": "docs/architecture/ADR-0006-cross-repo-integration.md"
+    }
+  ],
+  "provides": [
+    {
+      "id": "civilpdf.pdf-postprocess",
+      "protocol": "http",
+      "direction": "inbound",
+      "endpoint": "POST /api/v1/integration/pdf-jobs",
+      "status": "planned",
+      "consumer": "Civil-Docs-Platform",
+      "contract": "docs/api/cdp-if-09-contract.md",
+      "note": "CDP IF-09（確定 PDF の PDF/A 化・電子納品依頼）。実装は契約合意後。"
+    },
+    {
+      "id": "civilpdf.mcp",
+      "protocol": "mcp",
+      "direction": "inbound",
+      "endpoint": "mcp://civilpdf",
+      "status": "not-implemented",
+      "consumer": "Mirai-Construction-Agent-Harness",
+      "note": "MCAH blueprint の mcah_tool -> civilpdf エッジ。Core allowlist 登録後に公開する。"
+    }
+  ],
+  "consumes": [
+    {
+      "id": "core.contracts",
+      "protocol": "vendored-contracts",
+      "direction": "outbound",
+      "status": "not-integrated",
+      "provider": "Mirai-Harness-Core",
+      "note": "core.lock.json / contracts の pin は未導入。MCP 公開より先に必要。"
+    },
+    {
+      "id": "cdp.cde-registration",
+      "protocol": "http",
+      "direction": "outbound",
+      "status": "not-implemented",
+      "provider": "Civil-Docs-Platform",
+      "note": "承認確定後の CDE 登録（civilpdf -> cde）。CDP 側に受入 API が無いため未実装。"
+    }
+  ],
+  "ownership": {
+    "documents": "CivilPDF-DX",
+    "revisions": "CivilPDF-DX",
+    "approvals": "CivilPDF-DX",
+    "audit-trail": "CivilPDF-DX",
+    "delivery-packages": "CivilPDF-DX",
+    "cde-records": "Civil-Docs-Platform"
+  },
+  "registration": {
+    "platformInfra": "pending",
+    "harnessCore": "pending",
+    "civilDocsPlatform": "pending"
+  },
+  "siblingChecks": [
+    {
+      "repo": "Mirai-Platform-Infra",
+      "file": "systems.yaml"
+    },
+    {
+      "repo": "Mirai-Harness-Core",
+      "file": "registries/systems.yaml"
+    }
+  ],
+  "humanGates": [
+    "system_id の中央台帳（Mirai-Platform-Infra/systems.yaml, Mirai-Harness-Core/registries/systems.yaml）への登録",
+    "MCP allowlist への civilpdf 追加",
+    "本番 secret / Cloudflare Access の作成",
+    "MCDX-ADR-0004 決定 3 に基づく公開 DNS 追加の Approval PR"
+  ]
+}
