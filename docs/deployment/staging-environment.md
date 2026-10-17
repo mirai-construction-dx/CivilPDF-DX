@@ -197,7 +197,7 @@ docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
   stg は「本番に触らずに検証する面」であって**可用性の高い検証環境ではない**。
 - `MCDX-ADR-0002` は「新しく本番に出すアプリは Docker で動かさない」と定めるが、stg は本番ではないため
   これに抵触しない。ただし本番の実行形態との差（本番も compose であるため差は小さい）は残る。
-- frontend の stg 画面マーカーは**別 PR** で対応する（本ドキュメントの時点では未実装）。
+- frontend の stg 画面マーカーは PR #167 で実装済み。環境識別は `/health` の `environment=staging` を使う。
 
 ## 10. 人間ゲート（未解決・UNRESOLVED）
 
@@ -207,6 +207,10 @@ docker compose --env-file .env.stg -f docker-compose.staging.yml up -d --build
 | --- | ------------------------------------------------------------------------------------------------- | ------------ |
 | U-1 | Cloudflare Tunnel `civilpdf-stg` の作成と DNS レコード `civilpdf-stg` の追加                      | human kensan |
 | U-2 | Access application `civilpdf-stg` とポリシーの作成（bypass/everyone を置かない）                  | human kensan |
-| U-3 | `~/.config/civilpdf/stg.env` の実値（`SECRET_KEY`・`TIMESTAMP_HMAC_KEY`・`POSTGRES_PASSWORD` 等） | human kensan |
+| U-3 | ~~`~/.config/civilpdf/stg.env` の実値~~ **解消 2026-10-17**（0600 で作成し DB ロールと整合）      | —            |
 | U-4 | `civilpdf_stg` の保持期間                                                                         | DevOps       |
-| U-5 | frontend の stg 画面マーカー実装                                                                  | 別 PR        |
+| U-5 | ~~frontend の stg 画面マーカー実装~~ **解消 2026-10-17**（PR #167）                               | —            |
+
+> 2026-10-17 実測: `civilpdf-stg.service` は enabled/active で、再起動後も healthy。
+> `/health` は `environment=staging`、スモークは 7/7 PASS、DB は `alembic upgrade head` 済み。
+> 監視は `civilpdf-stg-monitor.timer`（5 分毎）。残る公開ゲートは U-1/U-2 のみ。
