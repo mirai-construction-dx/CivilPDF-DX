@@ -74,6 +74,12 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
 
+    # AI Provider（Anthropic）の直接呼び出しを許可する明示フラグ。既定は False。
+    # True でも ENVIRONMENT が development / test / local 以外（production・
+    # staging・未知の値）なら拒否する（services/ai_settings.direct_call_allowed）。
+    # staging / 本番の compose・env 定義には入れないこと（ADR-0007）。
+    ai_direct_call_allowed: bool = False
+
     # Microsoft 365 integration — Fernet key for client_secret encryption.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     m365_fernet_key: str = ""

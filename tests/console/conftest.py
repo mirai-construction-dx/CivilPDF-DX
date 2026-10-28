@@ -27,6 +27,15 @@ os.environ.setdefault(
 # stays "allowed before imports" for ruff's E402 rule.
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="civilpdf-test-uploads-")
 
+# The suite runs as a non-production environment with the direct-call flag on,
+# so the existing AI behaviour tests reach the kill switch / key / SDK checks.
+# Forced (not setdefault): a developer's .env or shell must not turn the suite
+# into "production" or "staging". The environment gate itself (refusal in
+# production / staging / unknown environments, flag default off) is covered in
+# test_ai_environment_gate.py, which overrides these values per test.
+os.environ["ENVIRONMENT"] = "test"
+os.environ["AI_DIRECT_CALL_ALLOWED"] = "true"
+
 # Keep the *app's own* engine off the deployed database. The fixture below only
 # overrides FastAPI's ``Depends(get_db)``; ``database.engine`` (used directly by
 # ``main.py`` for /health/ready) is built from ``DATABASE_URL`` at import time.
