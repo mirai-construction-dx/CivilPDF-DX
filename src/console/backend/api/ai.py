@@ -15,7 +15,7 @@ from models.document import Document
 from models.user import User
 from services import ai_settings as ai_settings_service
 from services.access_control import document_visible
-from services.audit_chain_service import create_chained_audit_log
+from services import ai_audit
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -129,6 +129,13 @@ def _get_model_name(db: Session) -> str:
     return ai_settings_service.get_model_name(db, _CLAUDE_MODEL)
 
 
+def _sent_chars(**create_kwargs) -> int:
+    """Characters this request sends to the provider (for the audit record)."""
+    return ai_audit.sent_chars(
+        create_kwargs.get("system"), create_kwargs.get("messages", [])
+    )
+
+
 def _send_to_ai(
     db: Session,
     client,
@@ -147,7 +154,10 @@ def _send_to_ai(
     recorded here as ``ai.document_<operation>_failed`` so the transmission is
     never missing from the trail. Only metadata is logged (model, operation,
     exception class) — never the prompt, document text or AI response.
+    Provider name and the number of characters sent are added for ADR-0007
+    (services/ai_audit.py).
     """
+    chars = _sent_chars(**create_kwargs)
     try:
         message = client.messages.create(model=model_name, **create_kwargs)
         return message.content[0].text
@@ -155,22 +165,18 @@ def _send_to_ai(
         raise
     except Exception as exc:
         db.rollback()
-        create_chained_audit_log(
+        ai_audit.record_provider_call(
             db,
             user_id=user_id,
             action=f"ai.document_{operation}_failed",
+            operation=operation,
+            model=model_name,
+            chars=chars,
+            result="error",
+            error=exc,
             resource_type="document",
             resource_id=document_id,
-            detail=json.dumps(
-                {
-                    "model": model_name,
-                    "operation": operation,
-                    "sent": True,
-                    "error_type": exc.__class__.__name__,
-                },
-                ensure_ascii=False,
-            ),
-            ip_address=None,
+            extra={"sent": True},
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -282,22 +288,21 @@ def classify_document(
     }
     doc.extra_data = extra
     db.commit()
-    create_chained_audit_log(
+    ai_audit.record_provider_call(
         db,
         user_id=current_user.id,
         action="ai.document_classified",
+        operation="classify",
+        model=model_name,
+        chars=_sent_chars(system=_CLASSIFY_SYSTEM, messages=[{"content": prompt}]),
+        result="success",
         resource_type="document",
         resource_id=document_id,
-        detail=json.dumps(
-            {
-                "drawing_type": drawing_type,
-                "project_type": project_type,
-                "confidence": confidence,
-                "model": model_name,
-            },
-            ensure_ascii=False,
-        ),
-        ip_address=None,
+        extra={
+            "drawing_type": drawing_type,
+            "project_type": project_type,
+            "confidence": confidence,
+        },
     )
 
     return ClassifyResponse(
@@ -382,14 +387,16 @@ def extract_document_data(
     }
     doc.extra_data = extra
     db.commit()
-    create_chained_audit_log(
+    ai_audit.record_provider_call(
         db,
         user_id=current_user.id,
         action="ai.document_extracted",
+        operation="extract",
+        model=model_name,
+        chars=_sent_chars(system=_EXTRACT_SYSTEM, messages=[{"content": prompt}]),
+        result="success",
         resource_type="document",
         resource_id=document_id,
-        detail=json.dumps({"model": model_name}, ensure_ascii=False),
-        ip_address=None,
     )
 
     return ExtractResponse(
@@ -456,14 +463,16 @@ def get_document_summary(
     }
     doc.extra_data = extra
     db.commit()
-    create_chained_audit_log(
+    ai_audit.record_provider_call(
         db,
         user_id=current_user.id,
         action="ai.document_summarized",
+        operation="summary",
+        model=model_name,
+        chars=_sent_chars(system=_SUMMARY_SYSTEM, messages=[{"content": prompt}]),
+        result="success",
         resource_type="document",
         resource_id=document_id,
-        detail=json.dumps({"model": model_name}, ensure_ascii=False),
-        ip_address=None,
     )
 
     return SummaryResponse(

@@ -42,6 +42,7 @@ Gateway の契約が公開されるまでの暫定例外は、条件を満たし
 - キーの置き場所: 管理画面から入力し、Fernet で暗号化して DB に保存する。DB に無ければ環境変数 `ANTHROPIC_API_KEY` を使う（`services/ai_settings.py` `get_api_key`）。応答はキーの有無（bool）だけを返す。
 - 停止スイッチ: `ai_settings.enabled`（既定 `False`）。設定行が読めないときも無効として扱う（fail closed、`services/ai_settings.py` `is_ai_enabled`）。キーがあるだけでは有効にならない。
 - 監査: 文書 3 操作は成功時に `ai.document_classified` / `ai.document_extracted` / `ai.document_summarized`、送信後の失敗時に `ai.document_<op>_failed` をチェーン監査に記録する。記録するのはモデル名などのメタデータだけで、プロンプト・本文・応答は記録しない。**Provider 名の欄は無い**（モデル名から推定はできる）。検索語の拡張と接続テストは監査に記録しない。
+  - 更新（PR #179）: `services/ai_audit.py` が、送信の監査 detail を一か所で組み立てる（`provider`=`anthropic`、`model`、`operation`、`sent_chars`、`result`、失敗時は `error_type`）。文書 3 操作は既存のアクション名と既存項目を保ったまま、これらの項目を加える。検索語の拡張は `ai.query_expanded`、接続テストは `ai.connection_tested` として記録する。送信前に拒否した経路は何も送らないので、記録しない。既存の `detail` 列を使うため migration は無い。
 - 文書のアクセス制御: 閲覧権限の無い文書・削除申請中の文書は 404 にし、AI に送らない（`_check_document_access`）。
 - 実行環境による制限: **無い**。`ENVIRONMENT`（`config.py` の `environment`）を見ておらず、本番・staging でも停止スイッチとキーが揃えば呼ぶ。本番で停止スイッチが ON かどうかは、本 ADR の作成時点で確認していない（値は本番 DB にある）。
   - 更新（PR #178）: 判定関数 `services/ai_settings.py` `direct_call_allowed` を追加した。上表の 5 か所はすべて、停止スイッチ・キー・文書本文より前にこの判定を見る。許可するのは、明示フラグ `AI_DIRECT_CALL_ALLOWED`（既定 false、staging / 本番の compose・env 定義には入れない）が true で、かつ `ENVIRONMENT` が development / test / local のときだけ。それ以外の環境や、設定を読めない場合は拒否する（文書 3 操作と接続テストは 503、検索語の拡張は元の検索語に戻る）。
@@ -54,7 +55,7 @@ Gateway の契約が公開されるまでの暫定例外は、条件を満たし
 | 既定は `disabled` | 停止スイッチの既定は OFF、fail closed | 充足 |
 | Gateway が使えないときに直接呼び出しへ切り替えない | Gateway の経路がまだ無いため、切り替えも無い | 充足（経路追加時に再確認） |
 | 送るのは internal 以下のデータだけ | 文書本文を送る。文書には顧客情報・個人情報が含まれうる。区分による送信制御は無い | **未充足** |
-| 監査に Provider 名を残す | モデル名のみ。検索語拡張・接続テストは監査なし | **一部未充足** |
+| 監査に Provider 名を残す | 5 か所すべてで、Provider に送るたびにチェーン監査へ provider・model・操作種別・操作者・対象文書・送信文字数・結果を記録する（本文・キーは記録しない） | 充足（PR #179） |
 | 期限 2026-12-25 | 本 ADR で提案 | 本 ADR で充足（承認後） |
 
 ### Gateway 経由へ移せるか
@@ -89,7 +90,7 @@ Gateway の契約が公開されるまでの暫定例外は、条件を満たし
 
 1. **本番相当の環境では無効にする。** `ENVIRONMENT` が本番・staging の場合は、停止スイッチが ON でも直接呼び出しを拒否して 503 を返す（接続テストを含む）。本番での機能停止を伴うため、オーナーの判断を経て出す。→ PR #178 で実装。
 2. **送る範囲を internal 以下に限る。** 機密区分（MCDX-ADR-0007）の対応付けが決まるまで、非本番では顧客データ・個人情報を含む文書を AI 操作の対象にしない運用とし、画面の注意書きで明示する。
-3. **監査に Provider 名を残す。** 既存の `ai.document_*` の detail に `provider: anthropic` を足す（アクション名は変えない）。検索語の拡張と接続テストにも監査を足す。
+3. **監査に Provider 名を残す。** 既存の `ai.document_*` の detail に `provider: anthropic` を足す（アクション名は変えない）。検索語の拡張と接続テストにも監査を足す。→ PR #179 で実装。
 4. **接続テストにも停止スイッチを適用する。**
 5. Gateway が使えないときに直接呼び出しへ切り替える実装を作らない（fail closed）。
 

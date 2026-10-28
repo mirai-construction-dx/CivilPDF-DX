@@ -12,6 +12,7 @@ from auth.dependencies import get_current_user
 from database import get_db
 from models.document import Document
 from models.user import User, UserRole
+from services import ai_audit
 from services import ai_settings as ai_settings_service
 from services.access_control import visible_documents_query
 
@@ -201,12 +202,22 @@ _EXPAND_SYSTEM = """あなたは建設業の文書検索エキスパートです
 必ずJSON配列で返してください: ["term1", "term2", ...]"""
 
 
-def _expand_query_with_claude(query: str, db: Session) -> list[str]:
+# Query expansion runs on every semantic search: keep the small, cheap model
+# regardless of the (possibly larger) admin setting.
+_EXPAND_MODEL = "claude-haiku-4-5-20251001"
+
+
+def _expand_query_with_claude(
+    query: str, db: Session, user_id: str | None = None
+) -> list[str]:
     """Use Claude to expand search query into related terms. Falls back to original on error.
 
     Honours the same admin kill switch, key and model settings as the AI API
     (services.ai_settings) instead of reading the environment directly, and the
     same environment gate (ADR-0007): production / staging never call out.
+
+    Each request actually sent is recorded as ``ai.query_expanded`` (ADR-0007):
+    provider, model, characters sent and success/error — never the search words.
     """
     if not ai_settings_service.direct_call_allowed():
         return [query]
@@ -220,22 +231,49 @@ def _expand_query_with_claude(query: str, db: Session) -> list[str]:
         import anthropic
 
         client = anthropic.Anthropic(api_key=api_key)
+    except Exception:
+        return [query]
+
+    messages = [{"role": "user", "content": f"クエリ: {query}"}]
+    chars = ai_audit.sent_chars(_EXPAND_SYSTEM, messages)
+    terms: list[str] = [query]
+    error: Exception | None = None
+    try:
         message = client.messages.create(
-            # Query expansion runs on every semantic search: keep the small,
-            # cheap model regardless of the (possibly larger) admin setting.
-            model="claude-haiku-4-5-20251001",
+            model=_EXPAND_MODEL,
             max_tokens=128,
             system=_EXPAND_SYSTEM,
-            messages=[{"role": "user", "content": f"クエリ: {query}"}],
+            messages=messages,
         )
         raw = message.content[0].text
-        terms = json.loads(raw)
-        if isinstance(terms, list) and terms:
-            return [str(t) for t in terms[:8]]
-    except Exception:
-        pass
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and parsed:
+            terms = [str(t) for t in parsed[:8]]
+    except Exception as exc:  # fall back to the original query
+        error = exc
 
-    return [query]
+    _record_query_expansion(db, user_id, chars, error)
+    return terms
+
+
+def _record_query_expansion(
+    db: Session, user_id: str | None, chars: int, error: Exception | None
+) -> None:
+    """Audit one sent expansion request; a failure to audit must not break search."""
+    try:
+        ai_audit.record_provider_call(
+            db,
+            user_id=user_id,
+            action="ai.query_expanded",
+            operation="query_expansion",
+            model=_EXPAND_MODEL,
+            chars=chars,
+            result="error" if error is not None else "success",
+            error=error,
+            resource_type="search",
+        )
+    except Exception:
+        db.rollback()
 
 
 def _escape_fts_term(term: str) -> str:
@@ -323,7 +361,7 @@ def search_documents(
         _rebuild_fts_index(db)
 
     if mode == "semantic":
-        expanded_terms = _expand_query_with_claude(q, db)
+        expanded_terms = _expand_query_with_claude(q, db, user_id=current_user.id)
     else:
         expanded_terms = [q]
 
@@ -390,4 +428,4 @@ def suggest_terms(
     current_user: User = Depends(get_current_user),
 ) -> list[str]:
     """Return AI-expanded search terms for a query (used by frontend autocomplete)."""
-    return _expand_query_with_claude(q, db)
+    return _expand_query_with_claude(q, db, user_id=current_user.id)
