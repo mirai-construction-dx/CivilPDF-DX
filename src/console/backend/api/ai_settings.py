@@ -16,6 +16,7 @@ except ImportError:
 from auth.dependencies import require_admin
 from database import get_db
 from models.user import User
+from services import ai_audit
 from services import ai_settings as ai_settings_service
 from services.audit_chain_service import create_chained_audit_log
 
@@ -128,23 +129,59 @@ def test_ai_connection(
             message="anthropic パッケージがインストールされていません。",
         )
 
+    model = "claude-haiku-4-5-20251001"
+    messages = [{"role": "user", "content": "ping"}]
+    sent = False
     try:
         row = ai_settings_service.get_ai_setting_row(db)
-        model = row.model_name or "claude-haiku-4-5-20251001"
+        model = row.model_name or model
 
         client = anthropic.Anthropic(api_key=api_key)
+        sent = True
         client.messages.create(
             model=model,
             max_tokens=10,
-            messages=[{"role": "user", "content": "ping"}],
+            messages=messages,
         )
+        _record_connection_test(db, current_user.id, model, messages, None)
         return AiConfigTestResult(
             ok=True,
             message=f"接続成功。モデル: {model}",
             model=model,
         )
     except Exception as exc:
+        if sent:
+            _record_connection_test(db, current_user.id, model, messages, exc)
         return AiConfigTestResult(
             ok=False,
             message=f"接続失敗: {exc}",
         )
+
+
+def _record_connection_test(
+    db: Session,
+    user_id: str,
+    model: str,
+    messages: list[dict],
+    error: Exception | None,
+) -> None:
+    """Audit a connection test that reached the provider (ADR-0007).
+
+    Metadata only: provider, model, characters sent and success/error with the
+    exception class. The exception message (shown to the admin) is not stored.
+    """
+    try:
+        ai_audit.record_provider_call(
+            db,
+            user_id=user_id,
+            action="ai.connection_tested",
+            operation="connection_test",
+            model=model,
+            chars=ai_audit.sent_chars(None, messages),
+            result="error" if error is not None else "success",
+            error=error,
+            resource_type="ai_settings",
+            resource_id="1",
+        )
+    except Exception:
+        db.rollback()
