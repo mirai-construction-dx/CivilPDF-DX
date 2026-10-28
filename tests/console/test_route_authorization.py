@@ -20,6 +20,10 @@ from fastapi.routing import APIRoute
 
 from auth.dependencies import get_current_user
 from main import app
+from services.service_auth import require_service
+
+# Only this exact route may use machine credentials in place of a user JWT.
+SERVICE_API_ROUTES = {("GET", "/api/v1/integration/ping")}
 
 # FastAPI >= 0.137 keeps included routers behind lazy wrapper nodes; the names
 # are private so they may be absent on older versions (the CI pins 0.136.3 where
@@ -37,6 +41,8 @@ except ImportError:  # fastapi < 0.137
 # asserted to exist, so a stale entry fails the suite instead of silently
 # widening the allowlist.
 PUBLIC_API_ROUTES: set[tuple[str, str]] = {
+    # Read-only system/version/interface metadata, deliberately no business data.
+    ("GET", "/api/v1/integration/catalog"),
     ("POST", "/api/v1/auth/token"),  # login
     ("POST", "/api/v1/auth/refresh"),  # refresh an expired access token
     ("POST", "/api/v1/auth/password-reset/request"),  # locked-out user
@@ -109,9 +115,37 @@ def _find_unprotected(
         for method in sorted(_route_methods(route)):
             if (method, path) in allowlist:
                 continue
-            if get_current_user not in _dependency_calls(route.dependant):
+            calls = _dependency_calls(route.dependant)
+            if (method, path) in SERVICE_API_ROUTES:
+                if require_service not in calls:
+                    unprotected.append(f"{method} {path}")
+                continue
+            if get_current_user not in calls:
                 unprotected.append(f"{method} {path}")
     return unprotected
+
+
+def test_service_route_cannot_omit_machine_auth():
+    from fastapi import FastAPI
+
+    probe = FastAPI()
+
+    @probe.get("/api/v1/integration/ping")
+    def unprotected_machine_route():
+        return {}
+
+    assert _find_unprotected(
+        [(route.path, route) for route in probe.routes if isinstance(route, APIRoute)]
+    ) == ["GET /api/v1/integration/ping"]
+
+
+def test_service_allowlist_has_no_stale_entries():
+    existing = {
+        (method, path)
+        for path, route in _api_routes()
+        for method in _route_methods(route)
+    }
+    assert SERVICE_API_ROUTES <= existing
 
 
 def test_api_route_inventory_is_not_empty():
@@ -205,6 +239,7 @@ def test_public_endpoints_are_few_and_deliberate():
     )
     # Only the auth/SSO handshake may be unauthenticated.
     for method, path in public_api:
-        assert path.startswith(
-            "/api/v1/auth/"
+        assert path.startswith("/api/v1/auth/") or (method, path) == (
+            "GET",
+            "/api/v1/integration/catalog",
         ), f"unexpected public route: {method} {path}"
