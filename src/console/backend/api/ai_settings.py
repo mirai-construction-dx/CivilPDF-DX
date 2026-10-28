@@ -104,7 +104,17 @@ def test_ai_connection(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Verify the Anthropic API key by making a minimal API call."""
+    """Verify the Anthropic API key by making a minimal API call.
+
+    Subject to the same environment gate as every other direct call
+    (ADR-0007): refused with 503 in production / staging, before the key is
+    read.
+    """
+    if not ai_settings_service.direct_call_allowed():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ai_settings_service.DIRECT_CALL_BLOCKED_DETAIL,
+        )
     api_key = ai_settings_service.get_api_key(db)
     if not api_key:
         return AiConfigTestResult(

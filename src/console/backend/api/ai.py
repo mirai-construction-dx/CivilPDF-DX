@@ -87,7 +87,16 @@ def _get_document_text(doc: Document) -> str:
 
 
 def _ensure_ai_enabled(db: Session) -> None:
-    """Kill switch gate — checked before any document text is extracted."""
+    """Environment gate + kill switch — checked before any document text is extracted.
+
+    The environment gate (ADR-0007) comes first and does not depend on the
+    database: production / staging refuse even when the kill switch is on.
+    """
+    if not ai_settings_service.direct_call_allowed():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ai_settings_service.DIRECT_CALL_BLOCKED_DETAIL,
+        )
     if not ai_settings_service.is_ai_enabled(db):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

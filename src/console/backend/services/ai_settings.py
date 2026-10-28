@@ -63,6 +63,35 @@ def _read_setting_row(db: Session) -> AiSetting | None:
         return None
 
 
+# 直接呼び出しを許可しうる実行環境（許可リスト）。これ以外の値 — production・
+# staging・空・未知の値 — はすべて本番相当として扱い、拒否する（fail closed）。
+_DIRECT_CALL_ENVIRONMENTS = frozenset({"development", "test", "local"})
+
+DIRECT_CALL_BLOCKED_DETAIL = (
+    "この実行環境では AI Provider の直接呼び出しは無効です（ADR-0007）"
+)
+
+
+def direct_call_allowed(cfg=None) -> bool:
+    """Single gate for every direct AI Provider call (ADR-0007).
+
+    Allowed only when the explicit flag ``AI_DIRECT_CALL_ALLOWED`` is true
+    *and* ``ENVIRONMENT`` is a non-production value on the allow-list.
+    Production, staging and any unknown/empty environment are refused even
+    with the flag set. Any error while reading the configuration also refuses.
+    This is checked before the admin kill switch, the API key and the
+    document text, and it is independent of both.
+    """
+    try:
+        cfg = cfg or settings
+        if cfg.ai_direct_call_allowed is not True:
+            return False
+        environment = str(cfg.environment or "").strip().lower()
+        return environment in _DIRECT_CALL_ENVIRONMENTS
+    except Exception:
+        return False
+
+
 def is_ai_enabled(db: Session) -> bool:
     """Admin kill switch: AI calls are allowed only when explicitly enabled.
 

@@ -205,8 +205,11 @@ def _expand_query_with_claude(query: str, db: Session) -> list[str]:
     """Use Claude to expand search query into related terms. Falls back to original on error.
 
     Honours the same admin kill switch, key and model settings as the AI API
-    (services.ai_settings) instead of reading the environment directly.
+    (services.ai_settings) instead of reading the environment directly, and the
+    same environment gate (ADR-0007): production / staging never call out.
     """
+    if not ai_settings_service.direct_call_allowed():
+        return [query]
     if not ai_settings_service.is_ai_enabled(db):
         return [query]
     api_key = ai_settings_service.get_api_key(db)
